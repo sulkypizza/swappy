@@ -28,10 +28,7 @@ namespace save_switcher
             }
         }
 
-        public void ReleaseFileFragment(IntPtr fragmentContext)
-        {
-
-        }
+        public void ReleaseFileFragment(IntPtr fragmentContext) { }
 
         public long GetFileSize()
         {
