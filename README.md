@@ -1,3 +1,3 @@
 # swappy
 
-Switch video game saves files between users
+Switch video game save files between users
