@@ -69,18 +69,25 @@ namespace save_switcher.Panels
         private bool gameProcessFound = true;
         private Form thisForm;
 
-        public RunGame(int gameId, int userId, DeviceContext deviceContext, Program.ChangePanel changePanelCallback)
+        public RunGame(int? gameId, int userId, DeviceContext deviceContext, Program.ChangePanel changePanelCallback)
         {
+            if(!gameId.HasValue)
+                throw new ArgumentNullException(nameof(gameId));
+
+
             databaseManager = new DatabaseManager();
 
             sw = new Stopwatch();
 
+            Debug.WriteLine($"gameid: {gameId}");
+            Application.Exit();
+
             this.deviceContext = deviceContext;
             this.changePanelCallback = changePanelCallback;
             inputs.userId = userId;
-            inputs.gameId = gameId;
+            inputs.gameId = gameId.Value;
             user = databaseManager.GetUser(userId);
-            game = databaseManager.GetGame(gameId);
+            game = databaseManager.GetGame(gameId.Value);
 
             reconnectControllers();
 

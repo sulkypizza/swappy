@@ -20,12 +20,11 @@ namespace save_switcher
     {
         public delegate void ChangePanel(Panel newPanel);
 
-        public static int GameID;
+        public static int? GameID;
 
         [STAThread]
         static void Main(string[] args)
         {
-            GameID = -1;
 
             //Args parsing:
             for(int i = 0; i < args.Length; i++)
@@ -35,7 +34,9 @@ namespace save_switcher
                 {
                     if(i + 1 < args.Length)
                     {
-                        int.TryParse(args[i + 1], out GameID);
+                        int parsed;
+                        if(int.TryParse(args[i + 1], out parsed))
+                            GameID = parsed;
                     }
                 }
                 else if(input == "help" || input == "?" || args[i] == "help")
@@ -46,11 +47,6 @@ namespace save_switcher
                 }
             }
 
-            if(GameID == -1)
-            {
-                MessageBox.Show("Error: Argument 'gameid' not set.  Please see help for details.", "An Error Occurred", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
             //Configuration.EnableObjectTracking = true;
 
             RenderForm form = new RenderForm("Swappy");
