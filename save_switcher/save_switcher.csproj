@@ -99,8 +99,8 @@
     <Compile Include="Panels\AddUser.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="Panels\Keyboardable.cs" />
-    <Compile Include="Panels\Mouseable.cs" />
+    <Compile Include="Panels\IKeyboardable.cs" />
+    <Compile Include="Panels\IMouseable.cs" />
     <Compile Include="Panels\Panel.cs" />
     <Compile Include="Panels\ProfileSelector.cs" />
     <Compile Include="Panels\RunGame.cs" />

@@ -7,7 +7,7 @@ using System.Windows.Forms;
 
 namespace save_switcher.Panels
 {
-    internal interface Mouseable
+    internal interface IMouseable
     {
         void OnMouseDown(MouseEventArgs e);
 

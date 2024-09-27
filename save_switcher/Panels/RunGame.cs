@@ -21,7 +21,7 @@ using System.Text;
 
 namespace save_switcher.Panels
 {
-    internal class RunGame : Panel, Mouseable
+    internal class RunGame : Panel, IMouseable
     {
         private const float baseFinalizeButtonSize = 200;
         private const float baseBorderThickness = 5f;

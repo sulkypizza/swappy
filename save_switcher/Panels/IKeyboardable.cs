@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace save_switcher.Panels
 {
-    internal interface Keyboardable
+    internal interface IKeyboardable
     {
         void OnKeyUp(System.Windows.Forms.KeyEventArgs e);
 

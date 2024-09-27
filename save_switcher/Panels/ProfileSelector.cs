@@ -20,7 +20,7 @@ using System.Drawing.Text;
 
 namespace save_switcher.Panels
 {
-    internal class ProfileSelector : Panel, Mouseable
+    internal class ProfileSelector : Panel, IMouseable
     {
         private readonly float baseProfilePictureSize = 300;
         private readonly float baseProfilePadding = 100;

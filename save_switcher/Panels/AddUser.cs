@@ -16,7 +16,7 @@ using SharpDX.Direct2D1.Effects;
 
 namespace save_switcher.Panels
 {
-    internal class AddUser : Panel, Mouseable, Keyboardable
+    internal class AddUser : Panel, IMouseable, IKeyboardable
     {
         private const float baseProfilePictureSize = 400;
         private const float baseDeleteButtonSize = 150;

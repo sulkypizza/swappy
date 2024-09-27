@@ -164,7 +164,7 @@ namespace save_switcher
 
             void OnMouseDown(object sender, System.Windows.Forms.MouseEventArgs e)
             {
-                Mouseable mouseablePanel = currentPanel as Mouseable;
+                IMouseable mouseablePanel = currentPanel as IMouseable;
                 if(mouseablePanel != null)
                 {
                     mouseablePanel.OnMouseDown(e);
@@ -174,7 +174,7 @@ namespace save_switcher
 
             void OnMouseUp(object sender, System.Windows.Forms.MouseEventArgs e)
             {
-                Mouseable mouseablePanel = currentPanel as Mouseable;
+                IMouseable mouseablePanel = currentPanel as IMouseable;
                 if (mouseablePanel != null)
                 {
                     mouseablePanel.OnMouseUp(e);
@@ -183,7 +183,7 @@ namespace save_switcher
 
             void OnMouseWheel(object sender, System.Windows.Forms.MouseEventArgs e)
             {
-                Mouseable mouseablePanel = currentPanel as Mouseable;
+                IMouseable mouseablePanel = currentPanel as IMouseable;
                 if(mouseablePanel != null)
                 {
                     mouseablePanel.OnMouseWheel(e);
@@ -192,7 +192,7 @@ namespace save_switcher
 
             void OnKeyDown(object sender, System.Windows.Forms.KeyEventArgs e)
             {
-                Keyboardable keyboardablePanel = currentPanel as Keyboardable;
+                IKeyboardable keyboardablePanel = currentPanel as IKeyboardable;
                 if(keyboardablePanel != null)
                 {
                     keyboardablePanel.OnKeyDown(e);
@@ -201,7 +201,7 @@ namespace save_switcher
 
             void OnKeyUp(object sender, System.Windows.Forms.KeyEventArgs e)
             {
-                Keyboardable keyboardablePanel = currentPanel as Keyboardable;
+                IKeyboardable keyboardablePanel = currentPanel as IKeyboardable;
                 if (keyboardablePanel != null)
                 {
                     keyboardablePanel.OnKeyUp(e);
@@ -210,7 +210,7 @@ namespace save_switcher
 
             void OnKeyPress(object sender, System.Windows.Forms.KeyPressEventArgs e)
             {
-                Keyboardable keyboardablePanel = currentPanel as Keyboardable;
+                IKeyboardable keyboardablePanel = currentPanel as IKeyboardable;
                 if (keyboardablePanel != null)
                 {
                     keyboardablePanel.OnKeyPress(e);
