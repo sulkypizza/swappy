@@ -97,7 +97,8 @@ namespace save_switcher
 
                 CREATE TABLE Users ( userid INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE ) STRICT;
 
-                CREATE TABLE Games ( gameid INTEGER PRIMARY KEY AUTOINCREMENT, gamename TEXT NOT NULL, gamecmd TEXT NOT NULL UNIQUE, gameargs TEXT ) STRICT;
+                CREATE TABLE Games ( gameid INTEGER PRIMARY KEY AUTOINCREMENT, gamename TEXT NOT NULL, gamecmd TEXT NOT NULL, gameargs TEXT, 
+                    UNIQUE (gamecmd, gameargs) ),  STRICT
 
                 CREATE TABLE SyncDefinitions ( syncdefid INTEGER PRIMARY KEY AUTOINCREMENT, gameid INTEGER NOT NULL REFERENCES Games (gameid) 
                     ON DELETE CASCADE ON UPDATE RESTRICT, syncsource TEXT UNIQUE NOT NULL, type INTEGER NOT NULL, description TEXT,
