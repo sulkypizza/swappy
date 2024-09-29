@@ -1,25 +1,35 @@
 ﻿using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Web;
-using System.Windows.Media.Animation;
 
 namespace save_switcher
 {
     internal static class RegistryHelper
     {
-        public static Dictionary<string, RegistryHive> RegistryBases = new Dictionary<string, RegistryHive>()
-        {
-                {"HKEY_CLASSES_ROOT", RegistryHive.ClassesRoot },
-                {"HKEY_CURRENT_USER", RegistryHive.CurrentUser },
-                {"HKEY_LOCAL_MACHINE", RegistryHive.LocalMachine },
-                {"HKEY_USERS", RegistryHive.Users },
-                {"HKEY_CURRENT_CONFIG", RegistryHive.CurrentConfig },
-        };
+        private static ReadOnlyDictionary<string, RegistryHive> RegistryBases = new ReadOnlyDictionary<string, RegistryHive>(
+            new Dictionary<string, RegistryHive>()
+            {
+                    {"HKEY_CLASSES_ROOT", RegistryHive.ClassesRoot },
+                    {"HKEY_CURRENT_USER", RegistryHive.CurrentUser },
+                    {"HKEY_LOCAL_MACHINE", RegistryHive.LocalMachine },
+                    {"HKEY_USERS", RegistryHive.Users },
+                    {"HKEY_CURRENT_CONFIG", RegistryHive.CurrentConfig },
+            }
+        );
+
+        public static ReadOnlyDictionary<Type, RegistryValueKind> RegistryValueKinds = new ReadOnlyDictionary<Type, RegistryValueKind>(
+            new Dictionary<Type, RegistryValueKind>()
+            {
+                {typeof(long), RegistryValueKind.QWord },
+                {typeof(int), RegistryValueKind.DWord },
+                {typeof(string), RegistryValueKind.String },
+                {typeof(string[]), RegistryValueKind.MultiString },
+                {typeof(byte[]), RegistryValueKind.Binary },
+            }
+        );
 
 
         public static RegistryHive? GetRegistryHive(string name)
@@ -45,9 +55,15 @@ namespace save_switcher
 
         public static void CopyRegistryKey(RegistryKey sourceKey, RegistryKey destinationKey)
         {
+            
             foreach (string value in sourceKey.GetValueNames())
             {
-                destinationKey.SetValue(value, sourceKey.GetValue(value), sourceKey.GetValueKind(value));
+                if(sourceKey.GetValueKind(value) == RegistryValueKinds[sourceKey.GetValue(value).GetType()]) //key value kind matches the data we expect out of it
+                    destinationKey.SetValue(value, sourceKey.GetValue(value), RegistryValueKinds[sourceKey.GetValue(value).GetType()]);
+                else  //key is storing an invalid data type
+                {
+                    destinationKey.SetValue(value, registryKeyValeToByteArray(sourceKey, value), RegistryValueKind.Binary);
+                }
             }
 
             foreach (string subkey in sourceKey.GetSubKeyNames())
@@ -83,7 +99,7 @@ namespace save_switcher
 
             void writeKeyVales(RegistryKey key)
             {
-                if (key == null)
+                if (object.Equals(key, null))
                     throw new Exception("Key does not exist.");
 
                 foreach (string value in key.GetValueNames())
@@ -92,47 +108,71 @@ namespace save_switcher
                     using (BinaryWriter writer = new BinaryWriter(fileStream))
                     {
                         RegistryValueKind valueKind = key.GetValueKind(value);
+                        RegistryValueKind actualValueKind = RegistryValueKinds[key.GetValue(value).GetType()];
 
                         writer.Write(key.Name.Replace(baseKey.Name, "").TrimStart('\\'));
                         writer.Write(value);
-                        writer.Write((int)valueKind);
 
-                        Console.WriteLine(key.GetValue(value));
-
-                        switch (valueKind)
+                        if (valueKind == actualValueKind)  //registrykey is not storing data in the wrong data type
                         {
-                            case RegistryValueKind.String:
-                            case RegistryValueKind.ExpandString:
-                                writer.Write((string)key.GetValue(value));
-                                break;
+                            //special care needs to be taken with REG_SZ and REG_EXP_SZ:
+                            if (valueKind == RegistryValueKind.String || valueKind == RegistryValueKind.ExpandString)
+                            {
+                                writer.Write((int)key.GetValueKind(value));
+                            }
+                            else
+                                writer.Write((int)valueKind);
 
-                            case RegistryValueKind.MultiString:
-                                string[] valueStrings = (string[])key.GetValue(value);
-                                writer.Write(valueStrings.Length);
+                            Console.WriteLine($"keyvalue: {key.GetValue(value)}    type: {key.GetValue(value).GetType()}");
 
-                                foreach (string valueString in valueStrings)
-                                {
-                                    writer.Write(valueString);
-                                }
-                                break;
+                            switch (valueKind)
+                            {
+                                case RegistryValueKind.String:
+                                case RegistryValueKind.ExpandString:
+                                    writer.Write((string)key.GetValue(value));
+                                    break;
 
-                            case RegistryValueKind.DWord:
-                                writer.Write((int)key.GetValue(value));
-                                break;
+                                case RegistryValueKind.MultiString:
+                                    string[] valueStrings = (string[])key.GetValue(value);
+                                    writer.Write(valueStrings.Length);
 
-                            case RegistryValueKind.QWord:
-                                writer.Write((long)key.GetValue(value));
-                                break;
+                                    foreach (string valueString in valueStrings)
+                                    {
+                                        writer.Write(valueString);
+                                    }
+                                    break;
 
-                            case RegistryValueKind.Binary:
-                                byte[] bytes = (byte[])key.GetValue(value);
+                                case RegistryValueKind.DWord:
+                                    writer.Write((int)key.GetValue(value));
+                                    break;
 
-                                writer.Write(bytes.Length);
-                                writer.Write(bytes);
-                                break;
+                                case RegistryValueKind.QWord:
+                                    writer.Write((long)key.GetValue(value));
+                                    break;
+
+                                case RegistryValueKind.Binary:
+
+                                    byte[] bytes = (byte[])key.GetValue(value);
+
+
+                                    writer.Write(bytes.Length);
+                                    writer.Write(bytes);
+                                    break;
+                            }
+
+                            writer.Close();
                         }
+                        else   //registry key value kind is incorrect, so we store it as binary
+                        {
+                            writer.Write((int)RegistryValueKind.Binary);
 
-                        writer.Close();
+                            byte[] bytes = registryKeyValeToByteArray(key, value);
+
+                            writer.Write(bytes.Length);
+                            writer.Write(bytes);
+
+                            writer.Close();
+                        }
                     }
                 }
             }
@@ -214,6 +254,56 @@ namespace save_switcher
 
                 workingKey.SetValue(valueName, readValue, valueKind);
             }
+        }
+
+        private static byte[] registryKeyValeToByteArray (RegistryKey key, string value)
+        {
+            List<byte> bytes = new List<byte>();
+
+            switch (key.GetValue(value).GetType().ToString())
+            {
+                case "System.Int32":
+                    foreach (byte b in BitConverter.GetBytes((int)key.GetValue(value)))
+                        bytes.Add(b);
+                    break;
+
+                case "System.Int64":
+                    foreach (byte b in BitConverter.GetBytes((long)key.GetValue(value)))
+                        bytes.Add(b);
+                    break;
+
+                case "System.String":
+                    string s = (string)key.GetValue(value);
+
+                    for (int i = 0; i < s.Length; i++)
+                    {
+                        foreach (byte b in BitConverter.GetBytes(s[i]))
+                            bytes.Add(b);
+                        
+                    }
+                    break;
+
+                case "System.String[]":
+                    string[] baseS = (string[])key.GetValue(value);
+
+                    for (int j = 0; j < baseS.Length; j++)
+                    {
+                        string s1 = baseS[j];
+                        for (int i = 0; i < s1.Length; i++)
+                        {
+                            foreach (byte b in BitConverter.GetBytes(s1[i]))
+                                bytes.Add(b);
+                        }
+                    }
+                    break;
+
+                case "System.Byte[]":
+                    foreach (byte b in (byte[])key.GetValue(value))
+                        bytes.Add(b);
+                    break;
+            }
+
+            return bytes.ToArray();
         }
     }
 }
