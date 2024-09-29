@@ -83,7 +83,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>swappy_icon.ico</ApplicationIcon>
+    <ApplicationIcon>Media\swappy_icon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="app.manifest" />
