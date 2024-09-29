@@ -79,9 +79,6 @@ namespace save_switcher.Panels
 
             sw = new Stopwatch();
 
-            Debug.WriteLine($"gameid: {gameId}");
-            Application.Exit();
-
             this.deviceContext = deviceContext;
             this.changePanelCallback = changePanelCallback;
             inputs.userId = userId;
