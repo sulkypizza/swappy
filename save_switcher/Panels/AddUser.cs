@@ -337,7 +337,6 @@ namespace save_switcher.Panels
         {
             float sizeScaling = deviceContext.Size.Height / baseScalingResolution.Height * (deviceContext.Size.Height / baseScalingResolution.Height / (deviceContext.Size.Width / baseScalingResolution.Width));
 
-            Console.WriteLine(sizeScaling);
             profilePictureSize = baseProfilePictureSize * sizeScaling;
             deleteButtonSize = baseDeleteButtonSize * sizeScaling;
             confirmDeletePanelImageSize = baseConfirmDeletePanelImageSize * sizeScaling;
@@ -905,8 +904,6 @@ namespace save_switcher.Panels
                     //get the current state and the old state for comparison
                     State currentControllerState = controllers[controller].GetState();
                     State compareState = oldControllerState[controller];
-
-                    Console.WriteLine((compareState.Gamepad.Buttons & (GamepadButtonFlags.A | GamepadButtonFlags.X)) == 0);
 
                     //if the left stick is past the dead zone this time and short the dead zone last time OR the d-pad is pressed
                     if (((float)currentControllerState.Gamepad.LeftThumbX / short.MaxValue > deadZone && ((float)compareState.Gamepad.LeftThumbX / short.MaxValue) < deadZone) ||

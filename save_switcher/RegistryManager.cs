@@ -123,8 +123,6 @@ namespace save_switcher
                             else
                                 writer.Write((int)valueKind);
 
-                            Console.WriteLine($"keyvalue: {key.GetValue(value)}    type: {key.GetValue(value).GetType()}");
-
                             switch (valueKind)
                             {
                                 case RegistryValueKind.String:
@@ -182,7 +180,6 @@ namespace save_switcher
                 foreach (string subKey in key.GetSubKeyNames())
                 {
                     RegistryKey regKey = key.OpenSubKey(subKey);
-                    Console.WriteLine(key.Name + "   subkey: " + subKey + "   registryKey: " + regKey.Name);
                     writeKeyVales(regKey);
                     recursiveIterate(regKey);
                 }
