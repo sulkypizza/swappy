@@ -62,7 +62,7 @@ namespace save_switcher
                     destinationKey.SetValue(value, sourceKey.GetValue(value), RegistryValueKinds[sourceKey.GetValue(value).GetType()]);
                 else  //key is storing an invalid data type
                 {
-                    destinationKey.SetValue(value, registryKeyValeToByteArray(sourceKey, value), RegistryValueKind.Binary);
+                    destinationKey.SetValue(value, registryKeyValueToByteArray(sourceKey, value), RegistryValueKind.Binary);
                 }
             }
 
@@ -164,7 +164,7 @@ namespace save_switcher
                         {
                             writer.Write((int)RegistryValueKind.Binary);
 
-                            byte[] bytes = registryKeyValeToByteArray(key, value);
+                            byte[] bytes = registryKeyValueToByteArray(key, value);
 
                             writer.Write(bytes.Length);
                             writer.Write(bytes);
@@ -253,7 +253,7 @@ namespace save_switcher
             }
         }
 
-        private static byte[] registryKeyValeToByteArray (RegistryKey key, string value)
+        private static byte[] registryKeyValueToByteArray (RegistryKey key, string value)
         {
             List<byte> bytes = new List<byte>();
 
