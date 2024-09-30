@@ -421,6 +421,19 @@ namespace save_switcher.Panels
         {
             this.deviceContext = deviceContext;
 
+            colorBrush.Dispose();
+            backgroundGradientBrush.Dispose();
+
+            for(int i = 0; i < users.Length; i++)
+            {
+                users[i].Layout.Dispose();
+            }
+
+            addUserLayout.Dispose();
+            editProfileInputTextLayout.Dispose();
+
+            whosPlayingLayout.Dispose();
+
             createSizeDependantResources(deviceContext);
         }
 
