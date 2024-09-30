@@ -27,7 +27,6 @@ namespace save_switcher.Panels
         private const float baseBorderThickness = 5f;
 
         private DeviceContext deviceContext;
-        private Program.ChangePanel changePanelCallback;
 
         private Size2 baseScalingResolution = new Size2(1920, 1080);
 
@@ -69,7 +68,7 @@ namespace save_switcher.Panels
         private bool gameProcessFound = true;
         private Form thisForm;
 
-        public RunGame(int? gameId, int userId, DeviceContext deviceContext, Program.ChangePanel changePanelCallback)
+        public RunGame(int? gameId, int userId, DeviceContext deviceContext)
         {
             if(!gameId.HasValue)
                 throw new ArgumentNullException(nameof(gameId));
@@ -80,7 +79,7 @@ namespace save_switcher.Panels
             sw = new Stopwatch();
 
             this.deviceContext = deviceContext;
-            this.changePanelCallback = changePanelCallback;
+
             inputs.userId = userId;
             inputs.gameId = gameId.Value;
             user = databaseManager.GetUser(userId);

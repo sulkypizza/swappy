@@ -27,7 +27,6 @@ namespace save_switcher.Panels
         private const float baseErrorIconSize = 50f;
         private readonly Size2 baseScalingResolution = new Size2(1920, 1080);
 
-        private readonly Program.ChangePanel changePanelCallback;
         private DeviceContext deviceContext;
         private float currentDeviceScale;
 
@@ -135,7 +134,7 @@ namespace save_switcher.Panels
             ConfirmDeleteNo,
         }
 
-        public AddUser(DeviceContext deviceContext, Program.ChangePanel changePanelCallback, User editUser = null) 
+        public AddUser(DeviceContext deviceContext, User editUser = null) 
         {
             sw = new Stopwatch();
 
@@ -156,8 +155,6 @@ namespace save_switcher.Panels
             };
             profileClickStream.Close();
 
-
-            this.changePanelCallback = changePanelCallback;
             this.deviceContext = deviceContext;
 
             currentScales = (1f, 1f, 1f, 1f, 1f, 1f, 1f);
@@ -558,7 +555,7 @@ namespace save_switcher.Panels
                                     //if (Path.GetFullPath(profileFullFileName) != Path.GetFullPath(destination))
                                     //    File.Copy(profileFullFileName, destination, true);
 
-                                    changePanelCallback(new ProfileSelector(deviceContext, changePanelCallback));
+                                    Program.ChangePanel(new ProfileSelector(deviceContext));
                                 }
                                 else if (!isEditingUserFlag)
                                 {
@@ -572,7 +569,7 @@ namespace save_switcher.Panels
 
                                         File.Copy(profileFullFileName, $@"{userDirectory.TrimEnd('\\')}\profile.png");
 
-                                        changePanelCallback(new ProfileSelector(deviceContext, changePanelCallback));
+                                        Program.ChangePanel(new ProfileSelector(deviceContext));
                                     }
                                 }
                             }
@@ -588,7 +585,7 @@ namespace save_switcher.Panels
                         else if (currentSelected.Equals(SelectableElement.Cancel))
                         {
                             playSelectedSound();
-                            changePanelCallback(new ProfileSelector(deviceContext, changePanelCallback));
+                            Program.ChangePanel(new ProfileSelector(deviceContext));
                         }
                         else if (currentSelected.Equals(SelectableElement.Profile))
                         {
@@ -642,7 +639,7 @@ namespace save_switcher.Panels
 
                             if (dbManager.DeleteUser(editingUserID.Value))
                             {
-                                changePanelCallback(new ProfileSelector(deviceContext, changePanelCallback));
+                                Program.ChangePanel(new ProfileSelector(deviceContext));
                             }
                         }
                     }
@@ -657,7 +654,7 @@ namespace save_switcher.Panels
                     else
                     {
                         playSelectedSound();
-                        changePanelCallback(new ProfileSelector(deviceContext, changePanelCallback));
+                        Program.ChangePanel(new ProfileSelector(deviceContext));
                     }
                     break;
 

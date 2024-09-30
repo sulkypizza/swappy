@@ -56,7 +56,6 @@ namespace save_switcher.Panels
         private readonly float selectedScale = 1.3f;
         private int selectedUserIndex;
 
-        private Program.ChangePanel changePanelCallback;
         private DeviceContext deviceContext;
 
         private InputLayers currentInputLayer = InputLayers.Users;
@@ -151,10 +150,8 @@ namespace save_switcher.Panels
             Controller,
         }
 
-        public ProfileSelector(DeviceContext deviceContext, Program.ChangePanel changePanelCallback) {
+        public ProfileSelector(DeviceContext deviceContext) {
 
-            //set the callback
-            this.changePanelCallback = changePanelCallback;
             this.deviceContext = deviceContext;
 
             sw = new Stopwatch();
@@ -370,16 +367,16 @@ namespace save_switcher.Panels
             {
                 //do the save swapping and start the game
                 if (users.Length > 0)
-                    changePanelCallback(new RunGame(Program.GameID, users[selectedUserIndex].User.ID, deviceContext, changePanelCallback));
+                    Program.ChangePanel(new RunGame(Program.GameID, users[selectedUserIndex].User.ID, deviceContext));
                 else
-                    changePanelCallback(new AddUser(deviceContext, changePanelCallback));
+                    Program.ChangePanel(new AddUser(deviceContext));
             }
             else if (currentInputLayer == InputLayers.Utilities)
             {
                 if (selectedUtilityIndex == 0)
                 {
                     //switch to the add user panel
-                    changePanelCallback(new AddUser(deviceContext, changePanelCallback));
+                    Program.ChangePanel(new AddUser(deviceContext));
                 }
                 else if (selectedUtilityIndex == 1)
                 {
@@ -413,7 +410,7 @@ namespace save_switcher.Panels
             {
                 //switch to the add user panel to edit a user
                 if(users.Length > 0)
-                    changePanelCallback(new AddUser(deviceContext, changePanelCallback, users[selectedUserIndex].User));
+                    Program.ChangePanel(new AddUser(deviceContext, users[selectedUserIndex].User));
             }
         } 
 
