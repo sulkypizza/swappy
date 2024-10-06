@@ -18,9 +18,10 @@ namespace save_switcher
 {
     class Program
     {
-        public delegate void ChangePanel(Panel newPanel);
-
         public static int? GameID;
+
+        private static Panel currentPanel;
+        private static SharpDX.Direct2D1.DeviceContext deviceContext;
 
         [STAThread]
         static void Main(string[] args)
@@ -67,8 +68,8 @@ namespace save_switcher
 
             SharpDX.Direct2D1.Factory1 d2dFactory = new SharpDX.Direct2D1.Factory1();
             SharpDX.Direct2D1.Device d2dDevice = new SharpDX.Direct2D1.Device(d2dFactory, dxgiDevice);
-            SharpDX.Direct2D1.DeviceContext d2dContext = new SharpDX.Direct2D1.DeviceContext(d2dDevice, DeviceContextOptions.None);
-            d2dContext.AntialiasMode = AntialiasMode.PerPrimitive;
+            deviceContext = new SharpDX.Direct2D1.DeviceContext(d2dDevice, DeviceContextOptions.None);
+            deviceContext.AntialiasMode = AntialiasMode.PerPrimitive;
 
             SwapChainDescription desc = new SwapChainDescription()
             {
@@ -87,15 +88,15 @@ namespace save_switcher
 
             Surface dxgiBackBuffer = swapChain.GetBackBuffer<Surface>(0);
 
-            Bitmap backBuffer = new Bitmap(d2dContext, dxgiBackBuffer, new BitmapProperties(new PixelFormat(Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied)));
+            Bitmap backBuffer = new Bitmap(deviceContext, dxgiBackBuffer, new BitmapProperties(new PixelFormat(Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied)));
 
-            d2dContext.Target = backBuffer;
+            deviceContext.Target = backBuffer;
 
             //set up brushes
-            SolidColorBrush colorBrush = new SolidColorBrush(d2dContext, Color.AliceBlue);
+            SolidColorBrush colorBrush = new SolidColorBrush(deviceContext, Color.AliceBlue);
 
             //startup panel
-            Panel currentPanel = new ProfileSelector(d2dContext, OnPanelChange);
+            currentPanel = new ProfileSelector(deviceContext);
 
             form.Resize += (object sender, EventArgs a) => { Draw(); };
 
@@ -128,10 +129,10 @@ namespace save_switcher
 
             void Draw()
             {
-                d2dContext.Transform = Matrix3x2.Identity;
+                deviceContext.Transform = Matrix3x2.Identity;
 
                 //panel rendering
-                currentPanel.Draw(d2dContext);
+                currentPanel.Draw(deviceContext);
 
                 swapChain.Present(0, PresentFlags.None);
             }
@@ -139,7 +140,7 @@ namespace save_switcher
             void Resize()
             {
 
-                d2dContext.Dispose();
+                deviceContext.Dispose();
                 backBuffer.Dispose();
                 dxgiBackBuffer.Dispose();
 
@@ -147,20 +148,15 @@ namespace save_switcher
 
                 dxgiBackBuffer = swapChain.GetBackBuffer<Surface>(0);
 
-                d2dContext = new SharpDX.Direct2D1.DeviceContext(d2dDevice, DeviceContextOptions.None);
-                d2dContext.AntialiasMode = AntialiasMode.PerPrimitive;
+                deviceContext = new SharpDX.Direct2D1.DeviceContext(d2dDevice, DeviceContextOptions.None);
+                deviceContext.AntialiasMode = AntialiasMode.PerPrimitive;
 
-                backBuffer = new Bitmap(d2dContext, dxgiBackBuffer, new BitmapProperties(new PixelFormat(Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied)));
+                backBuffer = new Bitmap(deviceContext, dxgiBackBuffer, new BitmapProperties(new PixelFormat(Format.B8G8R8A8_UNorm, AlphaMode.Premultiplied)));
 
-                d2dContext.Target = backBuffer;
+                deviceContext.Target = backBuffer;
 
-                currentPanel.Resize(d2dContext);
+                currentPanel.Resize(deviceContext);
             };
-
-            void OnPanelChange(Panel newPanel)
-            {
-                currentPanel = newPanel;
-            }
 
             void OnMouseDown(object sender, System.Windows.Forms.MouseEventArgs e)
             {
@@ -219,7 +215,7 @@ namespace save_switcher
 
             backBuffer.Dispose();
             dxgiBackBuffer.Dispose();
-            d2dContext.Dispose();
+            deviceContext.Dispose();
             d2dDevice.Dispose();
             d3dDevice.ImmediateContext.ClearState();
             d3dDevice.ImmediateContext.Flush();
@@ -227,6 +223,16 @@ namespace save_switcher
             swapChain.Dispose();
             dxgiFactory.Dispose();
             dxgiDevice.Dispose();
+        }
+
+        public static void ChangePanel(Panel newPanel)
+        {
+            currentPanel = newPanel;
+        }
+
+        public static SharpDX.Direct2D1.DeviceContext GetDeviceContext()
+        {
+            return deviceContext;
         }
     }
 }
