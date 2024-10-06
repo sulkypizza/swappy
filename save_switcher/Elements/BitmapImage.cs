@@ -32,18 +32,12 @@ namespace save_switcher.Elements
 
             Image = SharpDX.Direct2D1.Bitmap.FromWicBitmap(d2dDeviceContext, converter);
 
+            frame.Dispose();
             converter.Dispose();
             bitmapDecoder.Dispose();
             fileStream.Close();
             fileStream.Dispose();
-        }
-
-        ~BitmapImage()
-        {
-            fileStream.Dispose();
-            bitmapDecoder.Dispose();
-            frame.Dispose();
-            converter.Dispose();
+            imageFactory.Dispose();
         }
     }
 }

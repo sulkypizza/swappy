@@ -1180,5 +1180,51 @@ namespace save_switcher.Panels
 
             deviceContext.EndDraw();
         }
+
+        ~AddUser()
+        {
+            audioOut.Dispose();
+            profileClickStream.Dispose();
+            selectionClickBuffer.Stream.Dispose();
+
+            colorBrush.Dispose();
+            imagingFactory.Dispose();
+            acceptButtonImage.Image.Dispose();
+            deleteImage?.Image.Dispose();
+            cancelButtonImage.Image.Dispose();
+            errorImage.Image.Dispose();
+            errorIconTinted.Dispose();
+
+            defaultProfileImage?.Image.Dispose();
+            profileBrush.Dispose();
+            defaultImageGeometry.Dispose();
+
+            profileBrush.Dispose();
+
+            profileImage?.Image?.Dispose();
+
+            backgroundGradientBrush.Dispose();
+            profileGeometry.Dispose();
+
+            directWriteFactory.Dispose();
+            customFontLoader.Dispose();
+            fontCollection.Dispose();
+
+            usernameTextFormat.Dispose();
+            defaultUsernameLayout.Dispose();
+
+            errorProfileLayout.Dispose();
+            errorUsernameLayout.Dispose();
+
+            acceptButtonGeometry.Dispose();
+            cancelButtonGeometry.Dispose();
+
+            usernameLayout.Dispose();
+
+
+            confirmDeleteText?.Dispose();
+            confirmDeleteOKText?.Dispose();
+            confirmDeleteCancelText?.Dispose();
+        }
     }
 }

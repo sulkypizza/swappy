@@ -35,9 +35,19 @@ namespace save_switcher
             return stream.Length;
         }
 
+        public void CloseStream()
+        {
+            stream.Close();
+        }
+
         public long GetLastWriteTime()
         {
             return 0;
+        }
+
+        ~CustomFontStream()
+        {
+            stream?.Dispose();
         }
     }
 }

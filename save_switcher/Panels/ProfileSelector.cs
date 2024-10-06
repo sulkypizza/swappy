@@ -16,11 +16,10 @@ using System.Windows.Forms;
 using save_switcher.Imported;
 using Microsoft.Win32.SafeHandles;
 using System.Threading;
-using System.Drawing.Text;
 
 namespace save_switcher.Panels
 {
-    internal class ProfileSelector : Panel, IMouseable
+    class ProfileSelector : Panel, IMouseable
     {
         private readonly float baseProfilePictureSize = 300;
         private readonly float baseProfilePadding = 100;
@@ -349,6 +348,7 @@ namespace save_switcher.Panels
             directWriteFactory.Dispose();
             fontCollection.Dispose();
             customFontLoader.Dispose();
+            usernameFormat.Dispose();
 
             //resize utility buttons
             utilityButtonPositions.settingsPosition = new Vector2(deviceContext.Size.Width - (utilityButtonPadding + utilityButtonSize / 2), deviceContext.Size.Height - (utilityButtonSize / 2) - utilityButtonPadding);
@@ -358,13 +358,13 @@ namespace save_switcher.Panels
 
         private void changePanel()
         {
-
             //this method is called from Update() when the 'enter' event is triggered
             //it's used when we are done with this panel and want to switch to a new one
             
             //switch the panel based on what the current input selection is
             if(currentInputLayer == InputLayers.Users)
             {
+                Dispose();
                 //do the save swapping and start the game
                 if (users.Length > 0)
                     Program.ChangePanel(new RunGame(Program.GameID, users[selectedUserIndex].User.ID, deviceContext));
@@ -375,6 +375,7 @@ namespace save_switcher.Panels
             {
                 if (selectedUtilityIndex == 0)
                 {
+                    Dispose();
                     //switch to the add user panel
                     Program.ChangePanel(new AddUser(deviceContext));
                 }
@@ -810,22 +811,6 @@ namespace save_switcher.Panels
             }
 
 
-            /*
-                        //sets the start position for user profiles based on how many there are:
-                        //  if there are more than we can fit on the screen then start drawing them based on profilePadding from the left side of the screen
-                        float startPositionX = (users.Length * (profilePictureSize + profilePadding) > deviceContext.Size.Width) ? profilePadding : center.X - (users.Length * (profilePictureSize + profilePadding) - profilePadding) / 2;
-
-                        //if startPositionX is greater than what we can fit on screen then set it to -X so we can see the user we have selected
-                        if(startPositionX + ((selectedUserIndex + 1) * (profilePictureSize + profilePadding)) > deviceContext.Size.Width)
-                        {
-                            //get the amount of users we can fit on the screen
-                            float maxUserFit = deviceContext.Size.Width / (profilePictureSize + profilePadding);
-
-                            //set startPositionX to negative based on what user we have selected
-                            startPositionX = startPositionX - ((selectedUserIndex + 2 - maxUserFit) * (profilePictureSize + profilePadding));
-                        }
-            */
-
             if ((profilePictureSize + profilePadding) * users.Length > deviceContext.Size.Width)
             {
                 if (lastStartX + ((selectedUserIndex) * (profilePictureSize + profilePadding)) < 0)
@@ -1026,27 +1011,39 @@ namespace save_switcher.Panels
             lastControllerReconnectTime = sw.ElapsedMilliseconds;
         }
 
-        ~ProfileSelector() {
+        private void Dispose()
+        {
             utilityButtonImages.addUserImage.Image.Dispose();
             utilityButtonImages.settingsImage.Image.Dispose();
 
-            for(int i = 0; i < users.Length; i++)
+            for (int i = 0; i < users.Length; i++)
             {
                 users[i].ProfileGeometry.Dispose();
                 users[i].ProfileBrush.Dispose();
                 users[i].ProfileImage.Image.Dispose();
+                users[i].Layout.Dispose();
             }
 
             whosPlayingLayout.Dispose();
 
+            editProfileInputTextLayout.Dispose();
+
             colorBrush.Dispose();
             backgroundGradientBrush.Dispose();
 
-            if(selectionClickVoice != null)
+            if (selectionClickVoice != null)
                 selectionClickVoice.Dispose();
 
             audioOut.Dispose();
             profileClickStream.Dispose();
+
+            utilityButtonImages.addUserImage.Image.Dispose();
+            utilityButtonImages.settingsImage.Image.Dispose();
+            editProfileBitmap.Image.Dispose();
+            addUserStrokeStyle.Dispose();
+            inputImageMouseRightClick.Image.Dispose();
+            inputImageSpacebar.Image.Dispose();
+            inputImageXboxYButton.Image.Dispose();
 
             sw.Stop();
         }

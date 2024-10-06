@@ -85,8 +85,13 @@ namespace save_switcher
 
             for(int i = 0; i < fontFileStreams.Length; i++)
             {
+                fontFileStreams[i].CloseStream();
                 fontFileStreams[i].Dispose();
             }
+
+            currentFont.Dispose();
+            factory.Dispose();
+            enumeratorKey.Dispose();
 
             this.Dispose();
         }
@@ -108,9 +113,7 @@ namespace save_switcher
         {
             get
             {
-                ((IUnknown)currentFont).AddReference();
                 return currentFont;
-
             }
         }
 
