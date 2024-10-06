@@ -92,8 +92,27 @@ namespace save_switcher
     public class DatabaseManager
     {
 
-        static readonly string newDatabaseString =
-            @"  BEGIN TRANSACTION;
+        static readonly string saveFolderLocation = Path.GetFullPath(Directory.GetCurrentDirectory() + @"\syncs");
+        static readonly string dbLocation = Path.GetFullPath(saveFolderLocation + @"\save_switcher_data.db");
+
+        readonly SQLiteConnection connection;
+
+        public DatabaseManager()
+        {
+            if (!Directory.Exists(saveFolderLocation))
+                Directory.CreateDirectory(saveFolderLocation);
+
+            if (!File.Exists(dbLocation))
+                InitializeDB();
+
+            connection = new SQLiteConnection("Data Source=" + dbLocation);
+            connection.Open();
+        }
+
+        static void InitializeDB()
+        {
+             string newDatabaseString =
+                @"  BEGIN TRANSACTION;
 
                 CREATE TABLE Users ( userid INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE ) STRICT;
 
@@ -110,26 +129,6 @@ namespace save_switcher
 
                 COMMIT;";
 
-        static readonly string saveFolderLocation = Path.GetFullPath(Directory.GetCurrentDirectory() + @"\syncs");
-        static readonly string dbLocation = Path.GetFullPath(saveFolderLocation + @"\save_switcher_data.db");
-
-        static readonly SQLiteConnection connection;
-
-        static DatabaseManager()
-        {
-            if (!Directory.Exists(saveFolderLocation))
-                Directory.CreateDirectory(saveFolderLocation);
-
-            if (!File.Exists(dbLocation))
-                InitializeDB();
-
-            connection = new SQLiteConnection("Data Source=" + dbLocation);
-            connection.Open();
-
-        }
-
-        static void InitializeDB()
-        {
             Console.WriteLine("Creating tables...");
             SQLiteConnection conn = new SQLiteConnection("Data Source=" + dbLocation);
             conn.Open();
