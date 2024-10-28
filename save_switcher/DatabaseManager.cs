@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data.SQLite;
 using System.IO;
 using System.Linq;
@@ -145,7 +146,9 @@ namespace save_switcher
             if (string.IsNullOrEmpty(username))
                 return false;
 
-            SQLiteCommand cmd = new SQLiteCommand(string.Format($@"INSERT INTO Users(username) VALUES ('{username}')"), connection);
+            SQLiteCommand cmd = new SQLiteCommand(string.Format($@"INSERT INTO Users(username) VALUES (@username)"), connection);
+            cmd.CommandType = System.Data.CommandType.Text;
+            cmd.Parameters.Add(new SQLiteParameter("@username", username));
 
             try
             {
@@ -168,7 +171,11 @@ namespace save_switcher
                 return false;
 
             string argsOrNull = gameArgs ?? null;
-            SQLiteCommand cmd = new SQLiteCommand($@"INSERT INTO Games (gamename, gamecmd, gameargs) VALUES ('{gameName}', '{gameExec}', '{argsOrNull}')", connection);
+            SQLiteCommand cmd = new SQLiteCommand($@"INSERT INTO Games (gamename, gamecmd, gameargs) VALUES (@gameName, @gameExec, @args)", connection);
+            cmd.CommandType = System.Data.CommandType.Text;
+            cmd.Parameters.Add(new SQLiteParameter("@gameName", gameName));
+            cmd.Parameters.Add(new SQLiteParameter("@gameExec", gameExec));
+            cmd.Parameters.Add(new SQLiteParameter("@args", argsOrNull));
 
             try
             {
@@ -194,7 +201,12 @@ namespace save_switcher
             if (syncSource == null)
                 return false;
 
-            SQLiteCommand cmd = new SQLiteCommand(string.Format($@"INSERT INTO SyncDefinitions (gameid, syncsource, type, description) VALUES ({gameID}, '{syncSource}', {(int)type}, '{description}')"), connection);
+            SQLiteCommand cmd = new SQLiteCommand(string.Format($@"INSERT INTO SyncDefinitions (gameid, syncsource, type, description) VALUES (@gameID, @syncSource, @type, @description)"), connection);
+            cmd.CommandType = System.Data.CommandType.Text;
+            cmd.Parameters.Add(new SQLiteParameter("@gameID", gameID));
+            cmd.Parameters.Add(new SQLiteParameter("@syncSource", syncSource));
+            cmd.Parameters.Add(new SQLiteParameter("@type", (int)type));
+            cmd.Parameters.Add(new SQLiteParameter("@description", description));
 
             try
             {
@@ -211,7 +223,9 @@ namespace save_switcher
 
         public bool DeleteUser(int userID)
         {
-            SQLiteCommand cmd = new SQLiteCommand(string.Format($@"DELETE FROM Users WHERE userid = {userID}"), connection);
+            SQLiteCommand cmd = new SQLiteCommand(string.Format($@"DELETE FROM Users WHERE userid = @userID"), connection);
+            cmd.CommandType = System.Data.CommandType.Text;
+            cmd.Parameters.Add(new SQLiteParameter("@userID", userID));
 
             try
             {
@@ -229,7 +243,9 @@ namespace save_switcher
         public User GetUser(int userID)
         {
 
-            SQLiteCommand cmd = new SQLiteCommand($@"SELECT userid, username FROM Users WHERE userid = {userID} LIMIT 1", connection);
+            SQLiteCommand cmd = new SQLiteCommand($@"SELECT userid, username FROM Users WHERE userid = @userID LIMIT 1", connection);
+            cmd.CommandType = System.Data.CommandType.Text;
+            cmd.Parameters.Add(new SQLiteParameter("@userID", userID));
 
             SQLiteDataReader reader = cmd.ExecuteReader();
             if (reader.HasRows)
@@ -248,7 +264,10 @@ namespace save_switcher
 
         public User GetUser(string username)
         {
-            SQLiteCommand cmd = new SQLiteCommand($@"SELECT userid, username FROM Users WHERE username = '{username}' LIMIT 1", connection);
+            SQLiteCommand cmd = new SQLiteCommand($@"SELECT userid, username FROM Users WHERE username = @username LIMIT 1", connection);
+            cmd.CommandType = System.Data.CommandType.Text;
+            cmd.Parameters.Add(new SQLiteParameter("@username", username));
+
 
             SQLiteDataReader reader = cmd.ExecuteReader();
 
@@ -269,6 +288,7 @@ namespace save_switcher
         public User[] GetAllUsers()
         {
             SQLiteCommand cmd = new SQLiteCommand($@"SELECT userid, username FROM Users", connection);
+            cmd.CommandType = System.Data.CommandType.Text;
 
             SQLiteDataReader reader = cmd.ExecuteReader();
 
@@ -309,7 +329,9 @@ namespace save_switcher
 
         public Game GetGame(int gameid)
         {
-            SQLiteCommand cmd = new SQLiteCommand($@"SELECT gameid, gamename, gamecmd, gameargs FROM Games WHERE gameid = {gameid} LIMIT 1;", connection);
+            SQLiteCommand cmd = new SQLiteCommand($@"SELECT gameid, gamename, gamecmd, gameargs FROM Games WHERE gameid = @gameID LIMIT 1;", connection);
+            cmd.CommandType = System.Data.CommandType.Text;
+            cmd.Parameters.Add(new SQLiteParameter("@gameID", gameid));
 
             SQLiteDataReader reader = cmd.ExecuteReader();
 
@@ -335,6 +357,7 @@ namespace save_switcher
         public Game[] GetAllGames()
         {
             SQLiteCommand cmd = new SQLiteCommand($@"SELECT gameid, gamename, gamecmd, gameargs FROM Games ORDER BY gameid ASC", connection);
+            cmd.CommandType = System.Data.CommandType.Text;
 
             SQLiteDataReader reader = cmd.ExecuteReader();
 
@@ -375,6 +398,7 @@ namespace save_switcher
         public SyncDefinition[] GetAllSyncDefinitions()
         {
             SQLiteCommand cmd = new SQLiteCommand($@"SELECT syncdefid, gameid, syncsource, type, description FROM SyncDefinitions", connection);
+            cmd.CommandType = System.Data.CommandType.Text;
 
             SQLiteDataReader reader = cmd.ExecuteReader();
 
@@ -419,7 +443,9 @@ namespace save_switcher
 
         public SyncDefinition[] GetSyncDefinitions(int gameId)
         {
-            SQLiteCommand cmd = new SQLiteCommand($@"SELECT syncdefid, gameid, syncsource, type, description FROM SyncDefinitions WHERE gameid = {gameId} ORDER BY syncdefid ASC");
+            SQLiteCommand cmd = new SQLiteCommand($@"SELECT syncdefid, gameid, syncsource, type, description FROM SyncDefinitions WHERE gameid = @gameID ORDER BY syncdefid ASC");
+            cmd.CommandType = System.Data.CommandType.Text;
+            cmd.Parameters.Add(new SQLiteParameter("@gameID", gameId));
 
             SQLiteDataReader reader = cmd.ExecuteReader();
 
@@ -451,11 +477,14 @@ namespace save_switcher
         public Sync[] GetSyncs(int gameid, int userid)
         {
             SQLiteCommand cmd = new SQLiteCommand($@"SELECT SyncEntry.userid, SyncDefinitions.syncdefid, SyncDefinitions.gameid, SyncDefinitions.syncsource, SyncDefinitions.type FROM SyncDefinitions 
-                LEFT JOIN SyncEntry ON (SyncEntry.userid = {userid} AND SyncEntry.syncdefid = SyncDefinitions.syncdefid ) WHERE SyncDefinitions.gameid = {gameid};", connection);
+                LEFT JOIN SyncEntry ON (SyncEntry.userid = @userid AND SyncEntry.syncdefid = SyncDefinitions.syncdefid ) WHERE SyncDefinitions.gameid = @gameid;", connection);
+            cmd.CommandType = System.Data.CommandType.Text;
+            cmd.Parameters.Add(new SQLiteParameter("@userid", userid));
+            cmd.Parameters.Add(new SQLiteParameter("@gameid", gameid));
 
             SQLiteDataReader reader = cmd.ExecuteReader();
 
-            Sync[] syncs = new Sync[0];
+            List<Sync> syncs = new List<Sync>();
             while (reader.Read())
             {
                 string destPath = reader.GetString(3);
@@ -480,17 +509,19 @@ namespace save_switcher
 
                 Sync newEntry = new Sync(destPath, sourcePath, type);
 
-                Array.Resize(ref syncs, syncs.Length + 1);
-
-                syncs[syncs.Length - 1] = newEntry;
+                syncs.Add(newEntry);
             }
 
-            return syncs;
+            return syncs.ToArray();
         }
 
         public int GetSyncDefID(int gameId, string sourcePath, SyncType type)
         {
-            SQLiteCommand cmd = new SQLiteCommand($@"SELECT syncdefid FROM SyncDefinitions WHERE gameid = {gameId} AND syncsource = '{sourcePath.Trim('\"')}' AND type = {(int)type} LIMIT 1", connection);
+            SQLiteCommand cmd = new SQLiteCommand($@"SELECT syncdefid FROM SyncDefinitions WHERE gameid = @gameId AND syncsource = @syncSource AND type = @type LIMIT 1", connection);
+            cmd.CommandType = System.Data.CommandType.Text;
+            cmd.Parameters.Add(new SQLiteParameter("@gamdId", gameId));
+            cmd.Parameters.Add(new SQLiteParameter("@syncSource", sourcePath.Trim('\"')));
+            cmd.Parameters.Add(new SQLiteParameter("@type", (int)type));
 
             SQLiteDataReader reader = cmd.ExecuteReader();
 
@@ -505,7 +536,11 @@ namespace save_switcher
         public bool UpdateSync(int userid, int syncDefinitionID)
         {
 
-            SQLiteCommand cmd = new SQLiteCommand($@"INSERT OR REPLACE INTO SyncEntry (syncdefid, userid, lastplayed) VALUES ({syncDefinitionID}, {userid}, '{DateTime.UtcNow.Ticks}');", connection);
+            SQLiteCommand cmd = new SQLiteCommand($@"INSERT OR REPLACE INTO SyncEntry (syncdefid, userid, lastplayed) VALUES (@syncDefID, @userID, @date);", connection);
+            cmd.CommandType = System.Data.CommandType.Text;
+            cmd.Parameters.Add(new SQLiteParameter("@syncDefID", syncDefinitionID));
+            cmd.Parameters.Add(new SQLiteParameter("@userID", userid));
+            cmd.Parameters.Add(new SQLiteParameter("@date", DateTime.UtcNow.Ticks));
 
             try
             {
@@ -530,7 +565,10 @@ namespace save_switcher
             if (string.IsNullOrEmpty(newUsername))
                 return false;
 
-            SQLiteCommand cmd = new SQLiteCommand(string.Format($@"UPDATE Users SET username = '{newUsername}' WHERE userid = {userID}"), connection);
+            SQLiteCommand cmd = new SQLiteCommand(string.Format($@"UPDATE Users SET username = @newUsername WHERE userid = @userID"), connection);
+            cmd.CommandType = System.Data.CommandType.Text;
+            cmd.Parameters.Add(new SQLiteParameter("@newUsername", newUsername));
+            cmd.Parameters.Add(new SQLiteParameter("@userID", userID));
 
             try
             {
