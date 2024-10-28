@@ -54,9 +54,12 @@ namespace save_switcher
             
             form.ClientSize = new System.Drawing.Size(1920, 1080);
             form.MinimumSize = new System.Drawing.Size(800, 400);
-            form.WindowState = FormWindowState.Maximized;
             form.Icon = new System.Drawing.Icon("Media/swappy_icon.ico");
+
+#if !DEBUG
             form.FormBorderStyle = FormBorderStyle.None;
+            form.WindowState = FormWindowState.Maximized;
+#endif
             form.Show();
             
 
