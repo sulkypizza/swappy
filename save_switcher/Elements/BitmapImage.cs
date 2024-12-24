@@ -23,9 +23,22 @@ namespace save_switcher.Elements
         public BitmapImage(string fileLocation, DeviceContext d2dDeviceContext, ImagingFactory imageFactory)
         {
             imagingFactory = new ImagingFactory();
-            fileStream = new NativeFileStream(fileLocation, NativeFileMode.Open, NativeFileAccess.Read);
-            bitmapDecoder = new BitmapDecoder(imagingFactory, fileStream, DecodeOptions.CacheOnDemand);
-            frame = bitmapDecoder.GetFrame(0);
+
+            try
+            {
+                fileStream = new NativeFileStream(fileLocation, NativeFileMode.Open, NativeFileAccess.Read);
+                bitmapDecoder = new BitmapDecoder(imagingFactory, fileStream, DecodeOptions.CacheOnDemand);
+                frame = bitmapDecoder.GetFrame(0);
+            }
+            catch 
+            {
+                fileStream?.Close();
+                fileStream?.Dispose();
+
+                fileStream = new NativeFileStream("Media/image_error.png", NativeFileMode.Open, NativeFileAccess.Read);
+                bitmapDecoder = new BitmapDecoder(imagingFactory, fileStream, DecodeOptions.CacheOnDemand);
+                frame = bitmapDecoder.GetFrame(0);
+            }
 
             converter = new FormatConverter(imagingFactory);
             converter.Initialize(frame, SharpDX.WIC.PixelFormat.Format32bppPRGBA);
@@ -37,7 +50,6 @@ namespace save_switcher.Elements
             bitmapDecoder.Dispose();
             fileStream.Close();
             fileStream.Dispose();
-            imageFactory.Dispose();
         }
     }
 }

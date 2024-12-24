@@ -104,9 +104,7 @@
     <Compile Include="Elements\KeyboardButtonGoBack.cs" />
     <Compile Include="Elements\KeyboardButtonSpace.cs" />
     <Compile Include="Elements\KeyboardButtonShift.cs" />
-    <Compile Include="Panels\AddUser.cs">
-      <SubType>Component</SubType>
-    </Compile>
+    <Compile Include="Panels\AddUser.cs" />
     <Compile Include="Panels\IKeyboardable.cs" />
     <Compile Include="Panels\IMouseable.cs" />
     <Compile Include="Panels\Panel.cs" />
@@ -244,6 +242,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Media\edit.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Media\image_error.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Media\mouse.png">
