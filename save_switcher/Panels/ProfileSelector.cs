@@ -16,6 +16,7 @@ using System.Windows.Forms;
 using save_switcher.Imported;
 using Microsoft.Win32.SafeHandles;
 using System.Threading;
+using save_switcher.Panels.Subpanels;
 
 namespace save_switcher.Panels
 {

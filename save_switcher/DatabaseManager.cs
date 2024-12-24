@@ -341,8 +341,8 @@ namespace save_switcher
                 int readID = reader.GetInt32(0);
                 string readName = reader.GetString(1);
                 string readExec = reader.GetString(2);
+                
                 string readArgs = null;
-
                 if(!reader.IsDBNull(3))
                     readArgs = reader.GetString(3);
 
@@ -370,7 +370,10 @@ namespace save_switcher
                     int readID = reader.GetInt32(0);
                     string readName = reader.GetString(1);
                     string readCmd = reader.GetString(2);
-                    string readArgs = reader.GetString(3);
+                    
+                    string readArgs = null;
+                    if (!reader.IsDBNull(3))
+                        readArgs = reader.GetString(3);
 
                     if (users.Length > 0)
                     {

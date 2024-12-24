@@ -96,6 +96,14 @@
     <Compile Include="CustomFontCollectionLoader.cs" />
     <Compile Include="CustomFontStream.cs" />
     <Compile Include="Elements\BitmapImage.cs" />
+    <Compile Include="Elements\Button.cs" />
+    <Compile Include="Elements\InputNavigable.cs" />
+    <Compile Include="Elements\KeyboardButton.cs" />
+    <Compile Include="Elements\KeyboardButtonBackspace.cs" />
+    <Compile Include="Elements\KeyboardButtonCharacter.cs" />
+    <Compile Include="Elements\KeyboardButtonGoBack.cs" />
+    <Compile Include="Elements\KeyboardButtonSpace.cs" />
+    <Compile Include="Elements\KeyboardButtonShift.cs" />
     <Compile Include="Panels\AddUser.cs">
       <SubType>Component</SubType>
     </Compile>
@@ -104,6 +112,8 @@
     <Compile Include="Panels\Panel.cs" />
     <Compile Include="Panels\ProfileSelector.cs" />
     <Compile Include="Panels\RunGame.cs" />
+    <Compile Include="Panels\Subpanels\OnScreenKeyboard.cs" />
+    <Compile Include="Panels\Subpanels\Subpanel.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Imported.cs" />
     <Compile Include="DatabaseManager.cs" />
@@ -201,6 +211,9 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Media\backspace.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="Media\checkmark.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -217,12 +230,17 @@
     <Content Include="Media\add_user.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="Media\back_arrow.png" />
+    <Content Include="Media\back_arrow.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="Media\debug\big_test_picture.png" />
     <Content Include="Media\default_user_profile.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Media\delete.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Media\down_chevron.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Media\edit.png">
@@ -241,6 +259,18 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Media\settings.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Media\shift_locked.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Media\shift_pressed.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Media\shift_unpressed.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Media\space.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Media\spacebar.png">

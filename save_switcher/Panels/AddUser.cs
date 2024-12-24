@@ -13,6 +13,7 @@ using SharpDX.Multimedia;
 using SharpDX.XInput;
 using System.Collections.Generic;
 using SharpDX.Direct2D1.Effects;
+using save_switcher.Panels.Subpanels;
 
 namespace save_switcher.Panels
 {
@@ -29,6 +30,8 @@ namespace save_switcher.Panels
 
         private DeviceContext deviceContext;
         private float currentDeviceScale;
+
+        private OnScreenKeyboard OSKeyboard;
 
         private const float selectedScale = 1.2f;
         private float borderThickness;
@@ -97,6 +100,12 @@ namespace save_switcher.Panels
         private string username;
         private const int usernameLimit = 15;
         private TextLayout defaultUsernameLayout;
+
+        private HashSet<char> bannedUsernameChars = new HashSet<char> 
+            {
+                '\"', '\\', '\0', '\b', '\f', '\n', '\r', '\t', '\v',
+                '=', '+', ';', ':', '*', '%'
+            };
 
         private (float profilePicture, float acceptButton, float cancelButton, float deleteButton, float usernameTextbox,
             float confirmDeleteYes, float confirmDeleteNo) currentScales;
@@ -234,7 +243,7 @@ namespace save_switcher.Panels
 
         public void OnMouseDown(System.Windows.Forms.MouseEventArgs e)
         {
-            if (System.Windows.Forms.Form.ActiveForm == null)
+            if (System.Windows.Forms.Form.ActiveForm == null || OSKeyboard != null)
                 return;
 
             mouseState.leftMousePressed = true;
@@ -253,27 +262,55 @@ namespace save_switcher.Panels
 
         public void OnMouseWheel(System.Windows.Forms.MouseEventArgs e) { }
 
-        public void OnKeyDown(System.Windows.Forms.KeyEventArgs e) 
+        private void backspaceUsername(bool wordDelete)
         {
-            
             if (username == null)
                 username = "";
 
-            if (username.Length > 0 && e.KeyValue == (int)System.Windows.Forms.Keys.Back)
+            if (wordDelete)
             {
-                if (e.Control)
-                {
-                    string[] splitUsername = username.Split(' ');
-                    string[] destSplitUsername = new string[splitUsername.Length - 1];
-                    Array.Copy(splitUsername, destSplitUsername, splitUsername.Length - 1);
+                string[] splitUsername = username.Split(' ');
+                string[] destSplitUsername = new string[splitUsername.Length - 1];
+                Array.Copy(splitUsername, destSplitUsername, splitUsername.Length - 1);
 
-                    username = string.Join(" ", destSplitUsername);
-                }
-                else
-                    username = username.Substring(0, username.Length - 1);
+                username = string.Join(" ", destSplitUsername);
+            }
+            else if(username.Length > 0)
+                username = username.Substring(0, username.Length - 1);
+
+            usernameLayout.Dispose();
+            usernameLayout = new TextLayout(directWriteFactory, username, usernameTextFormat, 1000f, 100f);
+            
+        }
+
+        private void typeUsername(char c)
+        {
+            if (username == null)
+                username = "";
+
+            int typedKey = c;
+            //key 8 = backspace, tab = 9, 13 = enter, 27 = esacape
+            if (typedKey != 8 && typedKey != 9 && typedKey != 13 && typedKey != 27 &&
+                !bannedUsernameChars.Contains(c))
+            {
+                if (username.Length + 1 <= usernameLimit)
+                    username = username + c;
+
+                showEmptyError.username = false;
 
                 usernameLayout.Dispose();
                 usernameLayout = new TextLayout(directWriteFactory, username, usernameTextFormat, 1000f, 100f);
+            }
+        }
+
+        public void OnKeyDown(System.Windows.Forms.KeyEventArgs e) 
+        {
+            if (OSKeyboard != null)
+                return;
+
+            if(e.KeyValue == (int)Keys.Back)
+            {
+                backspaceUsername(e.Control);
             }
 
             if(e.KeyValue == (int)Keys.Enter)
@@ -311,23 +348,10 @@ namespace save_switcher.Panels
 
         public void OnKeyPress(System.Windows.Forms.KeyPressEventArgs e)
         {
-            
-            if (username == null)
-                username = "";
+            if (OSKeyboard != null)
+                return;
 
-            int asciiCode = e.KeyChar;
-
-            //filters uppercase, lowercase, numbers, ., -, (, ) and 'SPACE'
-            if ((asciiCode >= 65 && asciiCode <= 90) || (asciiCode >= 97 && asciiCode <= 122) || (asciiCode >= 48 && asciiCode <= 57) || asciiCode == 45 || asciiCode == 46 || asciiCode == 40 || asciiCode == 41 || asciiCode == 32)
-            {
-                if (username.Length + 1 <= usernameLimit)
-                    username = username + e.KeyChar;
-
-                showEmptyError.username = false;
-            }
-
-            usernameLayout.Dispose();
-            usernameLayout = new TextLayout(directWriteFactory, username, usernameTextFormat, 1000f, 100f);
+            typeUsername(e.KeyChar);
         }
 
         private void createSizeDependantResources(DeviceContext deviceContext)
@@ -624,6 +648,27 @@ namespace save_switcher.Panels
                             currentSelected = SelectableElement.ConfirmDeleteNo;
                             playSelectedSound();
                         }
+                        else if (currentSelected.Equals(SelectableElement.Textbox) && !mouseInput)
+                        {
+                            OSKeyboard = new OnScreenKeyboard(deviceContext);
+                            OSKeyboard.Activate();
+
+                            OSKeyboard.OnExit += (object o) =>
+                            {
+                                OSKeyboard = null;
+                            };
+
+                            OSKeyboard.OnUpdate += (char c) =>
+                            {
+                                typeUsername(c);
+                            };
+
+                            OSKeyboard.OnRawKey += (KeyEventArgs args) =>
+                            {
+                                if (args.KeyCode == Keys.Back)
+                                    backspaceUsername(args.Control);
+                            };
+                        }
                     }
                     else
                     {
@@ -800,6 +845,9 @@ namespace save_switcher.Panels
             this.deviceContext = deviceContext;
 
             createSizeDependantResources(deviceContext);
+
+            if (OSKeyboard != null)
+                OSKeyboard.Resize(deviceContext);
         }
 
         public void Update()
@@ -808,6 +856,12 @@ namespace save_switcher.Panels
             Form activeForm = System.Windows.Forms.Form.ActiveForm;
             if (activeForm == null)
                 return;
+
+            if(OSKeyboard != null)
+            {
+                OSKeyboard.Update();
+                return;
+            }
 
             System.Drawing.Point currentMousePos = System.Windows.Forms.Cursor.Position;
             System.Drawing.Point mouseToScreen = activeForm.PointToClient(currentMousePos);
@@ -1179,6 +1233,9 @@ namespace save_switcher.Panels
             }
 
             deviceContext.EndDraw();
+
+            if (OSKeyboard != null)
+                OSKeyboard.Draw();
         }
 
         ~AddUser()
@@ -1196,15 +1253,15 @@ namespace save_switcher.Panels
             errorIconTinted.Dispose();
 
             defaultProfileImage?.Image.Dispose();
-            profileBrush.Dispose();
-            defaultImageGeometry.Dispose();
+            profileBrush?.Dispose();
+            defaultImageGeometry?.Dispose();
 
-            profileBrush.Dispose();
+            profileBrush?.Dispose();
 
             profileImage?.Image?.Dispose();
 
-            backgroundGradientBrush.Dispose();
-            profileGeometry.Dispose();
+            backgroundGradientBrush?.Dispose();
+            profileGeometry?.Dispose();
 
             directWriteFactory.Dispose();
             customFontLoader.Dispose();

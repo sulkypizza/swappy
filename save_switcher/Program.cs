@@ -22,6 +22,9 @@ namespace save_switcher
 
         private static Panel currentPanel;
         private static SharpDX.Direct2D1.DeviceContext deviceContext;
+        private static SharpDX.DirectWrite.Factory directWriteFactory;
+        private static SharpDX.DirectWrite.FontCollection fontCollection;
+        private static Form programForm;
 
         [STAThread]
         static void Main(string[] args)
@@ -121,7 +124,11 @@ namespace save_switcher
 
             form.MouseWheel += new System.Windows.Forms.MouseEventHandler(OnMouseWheel);
 
+            programForm = form;
 
+            directWriteFactory = new SharpDX.DirectWrite.Factory();
+            var customFontLoader = new CustomFontCollectionLoader(directWriteFactory);
+            fontCollection = new SharpDX.DirectWrite.FontCollection(directWriteFactory, customFontLoader, customFontLoader.KeyStream);
 
             RenderLoop.Run(form, () => { Update(); Draw(); });
 
@@ -236,6 +243,21 @@ namespace save_switcher
         public static SharpDX.Direct2D1.DeviceContext GetDeviceContext()
         {
             return deviceContext;
+        }
+
+        public static Form GetProgramForm()
+        {
+            return programForm;
+        }
+
+        public static SharpDX.DirectWrite.Factory GetDirectWriteFactory()
+        {
+            return directWriteFactory;
+        }
+
+        public static SharpDX.DirectWrite.FontCollection GetFontCollection()
+        {
+            return fontCollection;
         }
     }
 }
