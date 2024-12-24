@@ -327,6 +327,41 @@ namespace save_switcher
             return users;
         }
 
+        public User[] GetAllUsers(int gameID)
+        {
+            SQLiteCommand cmd = new SQLiteCommand($@"SELECT Users.userid, Users.username FROM Users LEFT JOIN SyncEntry 
+                                                   ON Users.userid = SyncEntry.userid AND SyncEntry.syncdefid = 
+                                                   (SELECT SyncDefinitions.syncdefid FROM SyncDefinitions WHERE SyncDefinitions.gameid = @gameID LIMIT 1) 
+                                                   ORDER BY SyncEntry.lastplayed DESC", connection);
+            cmd.CommandType = System.Data.CommandType.Text;
+            cmd.Parameters.Add(new SQLiteParameter("@gameID", gameID));
+
+            SQLiteDataReader reader = cmd.ExecuteReader();
+
+            LinkedList<User> users = new LinkedList<User>();
+            if (reader.HasRows)
+            {
+                bool nextRow = reader.Read();
+
+                while (nextRow)
+                {
+                    int readID = reader.GetInt32(0);
+                    string readName = reader.GetString(1);
+
+                    users.AddLast(new User(readID, readName));
+
+                    nextRow = reader.Read();
+                }
+
+            }
+            else
+            {
+                return null;
+            }
+
+            return users.ToArray();
+        }
+
         public Game GetGame(int gameid)
         {
             SQLiteCommand cmd = new SQLiteCommand($@"SELECT gameid, gamename, gamecmd, gameargs FROM Games WHERE gameid = @gameID LIMIT 1;", connection);

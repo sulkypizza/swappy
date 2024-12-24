@@ -188,7 +188,7 @@ namespace save_switcher.Panels
             databaseManager = new DatabaseManager();
 
             //create users
-            User[] dbUsers = databaseManager.GetAllUsers();
+            User[] dbUsers = Program.GameID == null ? databaseManager.GetAllUsers() : databaseManager.GetAllUsers(Program.GameID.Value);
             users = dbUsers != null ? new ProfileUser[dbUsers.Length] : new ProfileUser[0];
 
             for(int i = 0; i < users.Length; i++)
