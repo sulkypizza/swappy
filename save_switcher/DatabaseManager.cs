@@ -522,7 +522,7 @@ namespace save_switcher
         {
             SQLiteCommand cmd = new SQLiteCommand($@"SELECT syncdefid FROM SyncDefinitions WHERE gameid = @gameId AND syncsource = @syncSource AND type = @type LIMIT 1", connection);
             cmd.CommandType = System.Data.CommandType.Text;
-            cmd.Parameters.Add(new SQLiteParameter("@gamdId", gameId));
+            cmd.Parameters.Add(new SQLiteParameter("@gameId", gameId));
             cmd.Parameters.Add(new SQLiteParameter("@syncSource", sourcePath.Trim('\"')));
             cmd.Parameters.Add(new SQLiteParameter("@type", (int)type));
 
