@@ -192,6 +192,8 @@ namespace save_switcher.Panels
 
                     proc.Start();
 
+                    proc.Exited += (_,__) => { Program.GetProgramForm().Focus(); };
+
                 }
                 else
                 {
