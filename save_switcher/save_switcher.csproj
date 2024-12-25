@@ -104,12 +104,14 @@
     <Compile Include="Elements\KeyboardButtonGoBack.cs" />
     <Compile Include="Elements\KeyboardButtonSpace.cs" />
     <Compile Include="Elements\KeyboardButtonShift.cs" />
+    <Compile Include="Elements\SimpleButton.cs" />
     <Compile Include="Panels\AddUser.cs" />
     <Compile Include="Panels\IKeyboardable.cs" />
     <Compile Include="Panels\IMouseable.cs" />
     <Compile Include="Panels\Panel.cs" />
     <Compile Include="Panels\ProfileSelector.cs" />
     <Compile Include="Panels\RunGame.cs" />
+    <Compile Include="Panels\Settings.cs" />
     <Compile Include="Panels\Subpanels\OnScreenKeyboard.cs" />
     <Compile Include="Panels\Subpanels\Subpanel.cs" />
     <Compile Include="Program.cs" />
