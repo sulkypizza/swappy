@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.4.33205.214
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "save_switcher", "save_switcher\save_switcher.csproj", "{40BFD0B6-D542-4FA8-9F29-A4CDE66510A8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SaveSwitcher", "save_switcher\SaveSwitcher.csproj", "{40BFD0B6-D542-4FA8-9F29-A4CDE66510A8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "gameWatchHelper", "GameWatchHelper\gameWatchHelper.csproj", "{3799F67A-172D-4FE4-8F90-76BB7A85E214}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GameWatchHelper", "GameWatchHelper\GameWatchHelper.csproj", "{3799F67A-172D-4FE4-8F90-76BB7A85E214}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
