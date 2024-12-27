@@ -381,32 +381,7 @@ namespace save_switcher.Panels
                     Program.ChangePanel(new AddUser(deviceContext));
                 }
                 else if (selectedUtilityIndex == 1)
-                {
-                    //switch to the settings panel
-                    //TODO
-
-                    //for now just open up a console window so we can do stuff
-                    new Thread(() =>
-                    {
-                        Kernel32.FreeConsole();
-                        Kernel32.AllocConsole();
-
-                        var file = new SafeFileHandle(Kernel32.CreateFileW("CONOUT$", Kernel32.GENERIC_WRITE, Kernel32.FILE_SHARE_WRITE, IntPtr.Zero, Kernel32.OPEN_EXISTING, Kernel32.FILE_ATTRIBUTE_NORMAL, IntPtr.Zero), true);
-                        FileStream fs = null;
-                        if (file != null)
-                            fs = new FileStream(file, FileAccess.Write);
-
-                        if (fs != null)
-                        {
-                            var writer = new StreamWriter(fs) { AutoFlush = true };
-                            Console.SetOut(writer);
-                            Console.SetError(writer);
-                        }
-
-                        old_Program.theMain();
-
-                    }).Start();
-                }
+                    Program.ChangePanel(new Settings(deviceContext));
             }
             else if(currentInputLayer == InputLayers.EditProfile)
             {
