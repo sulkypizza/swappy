@@ -237,6 +237,9 @@ namespace save_switcher
 
         public static void ChangePanel(Panel newPanel)
         {
+            if (currentPanel is IDisposable)
+                ((IDisposable)currentPanel).Dispose();
+
             currentPanel = newPanel;
         }
 
