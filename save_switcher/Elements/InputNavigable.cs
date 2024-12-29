@@ -9,10 +9,10 @@ namespace save_switcher.Elements
 
     public enum NavigateDirection
     {
-        Up = 0,
-        Down = 3,
-        Left = 1,
-        Right = 2,
+        Up = 0x00,
+        Down = 0x11,
+        Left = 0x10,
+        Right = 0x01,
     };
 
     abstract class InputNavigable
@@ -55,10 +55,10 @@ namespace save_switcher.Elements
 
         public abstract void Deselect();
 
-        public static void ConnectNeighbors(NavigateDirection directionAtoB, InputNavigable a, InputNavigable b)
+        public static void ConnectNeighbors(InputNavigable a, InputNavigable b, NavigateDirection directionAtoB)
         {
             a.AddNeighbor(directionAtoB, b);
-            b.AddNeighbor((NavigateDirection)((byte)directionAtoB ^ 3), a);
+            b.AddNeighbor((NavigateDirection)((byte)directionAtoB ^ 0x11), a);
         }
     }
 }
