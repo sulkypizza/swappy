@@ -65,18 +65,24 @@ namespace save_switcher.Elements
 
         public void OnKeyDown(object sender, KeyEventArgs e)
         {
-            if (CurrentSelectedObject == this)
+            void handleEvent(Action a)
+            {
+                a.Invoke();
+                e.Handled = true;
+            }
+
+            if (CurrentSelectedObject == this && e.Handled == false)
             {
                 if (e.KeyCode == Keys.Left)
-                    SelectNeighbor(NavigateDirection.Left);
+                    handleEvent(() => SelectNeighbor(NavigateDirection.Left));
                 else if (e.KeyCode == Keys.Right)
-                    SelectNeighbor(NavigateDirection.Right);
+                    handleEvent(() => SelectNeighbor(NavigateDirection.Right));
                 else if (e.KeyCode == Keys.Up)
-                    SelectNeighbor(NavigateDirection.Up);
+                    handleEvent(() => SelectNeighbor(NavigateDirection.Up));
                 else if (e.KeyCode == Keys.Down)
-                    SelectNeighbor(NavigateDirection.Down);
+                    handleEvent(() => SelectNeighbor(NavigateDirection.Down));
                 else if (e.KeyCode == Keys.Enter)
-                    pressButton();
+                    handleEvent(() => pressButton());
             }
 
         }
