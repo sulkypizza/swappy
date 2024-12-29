@@ -175,7 +175,7 @@ class old_Program
 
                         if (!Equals(game, null))
                         {
-                            Sync[] syncs = databaseManager.GetSyncs(game.ID, user.ID);
+                            Sync[] syncs = databaseManager.GetUserSyncs(game.ID, user.ID);
 
                             foreach (Sync sync in syncs)
                             {
@@ -242,7 +242,7 @@ class old_Program
                                 int syncDefId = databaseManager.GetSyncDefID(game.ID, sync.GameLocation, sync.Type);
 
                                 if (syncDefId >= 0)
-                                    databaseManager.UpdateSync(user.ID, syncDefId);
+                                    databaseManager.UpdateUserSync(user.ID, syncDefId);
                             }
 
                         }

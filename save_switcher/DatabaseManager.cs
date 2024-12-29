@@ -481,7 +481,7 @@ namespace save_switcher
 
         public SyncDefinition[] GetSyncDefinitions(int gameId)
         {
-            SQLiteCommand cmd = new SQLiteCommand($@"SELECT syncdefid, gameid, syncsource, type, description FROM SyncDefinitions WHERE gameid = @gameID ORDER BY syncdefid ASC");
+            SQLiteCommand cmd = new SQLiteCommand($@"SELECT syncdefid, gameid, syncsource, type, description FROM SyncDefinitions WHERE gameid = @gameID ORDER BY syncdefid ASC", connection);
             cmd.CommandType = System.Data.CommandType.Text;
             cmd.Parameters.Add(new SQLiteParameter("@gameID", gameId));
 
@@ -512,7 +512,7 @@ namespace save_switcher
                 return null;
         }
 
-        public Sync[] GetSyncs(int gameid, int userid)
+        public Sync[] GetUserSyncs(int gameid, int userid)
         {
             SQLiteCommand cmd = new SQLiteCommand($@"SELECT SyncEntry.userid, SyncDefinitions.syncdefid, SyncDefinitions.gameid, SyncDefinitions.syncsource, SyncDefinitions.type FROM SyncDefinitions 
                 LEFT JOIN SyncEntry ON (SyncEntry.userid = @userid AND SyncEntry.syncdefid = SyncDefinitions.syncdefid ) WHERE SyncDefinitions.gameid = @gameid;", connection);
@@ -530,7 +530,7 @@ namespace save_switcher
 
                 if (reader.IsDBNull(0))
                 {
-                    UpdateSync(userid, syncDefId);
+                    UpdateUserSync(userid, syncDefId);
                 }
 
                 SyncType type = (SyncType)reader.GetInt32(4);
@@ -571,7 +571,7 @@ namespace save_switcher
                 return -1;
         }
 
-        public bool UpdateSync(int userid, int syncDefinitionID)
+        public bool UpdateUserSync(int userid, int syncDefinitionID)
         {
 
             SQLiteCommand cmd = new SQLiteCommand($@"INSERT OR REPLACE INTO SyncEntry (syncdefid, userid, lastplayed) VALUES (@syncDefID, @userID, @date);", connection);
@@ -589,7 +589,7 @@ namespace save_switcher
                 DialogResult result = MessageBox.Show(e.Message + "\n" + e.ErrorCode, "Error in method UpdateSync", MessageBoxButtons.RetryCancel);
                 if (result == DialogResult.Retry)
                 {
-                    UpdateSync(userid, syncDefinitionID);
+                    UpdateUserSync(userid, syncDefinitionID);
                 }
                 else
                     throw e;
