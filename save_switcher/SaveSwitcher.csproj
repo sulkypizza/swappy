@@ -115,7 +115,6 @@
     <Compile Include="Panels\Subpanels\OnScreenKeyboard.cs" />
     <Compile Include="Panels\Subpanels\Subpanel.cs" />
     <Compile Include="Program.cs" />
-    <Compile Include="Imported.cs" />
     <Compile Include="DatabaseManager.cs" />
     <Compile Include="RegistryManager.cs" />
   </ItemGroup>
