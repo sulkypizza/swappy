@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Forms;
+using Microsoft.Win32;
 using save_switcher.Elements;
 using SharpDX;
 using SharpDX.Direct2D1;
@@ -191,6 +193,7 @@ namespace save_switcher.Panels
             f.Size = new System.Drawing.Size(800, 600);
             f.Icon = new System.Drawing.Icon("Media/swappy_icon.ico");
             f.StartPosition = FormStartPosition.CenterParent;
+            f.FormBorderStyle = FormBorderStyle.FixedSingle;
 
             TreeView tv = new TreeView();
             tv.Size = new System.Drawing.Size(f.Size.Width - 50, f.Size.Height - 150);
@@ -326,7 +329,138 @@ namespace save_switcher.Panels
 
         private void addSyncButtonAction()
         {
+            Form f = new Form();
+            f.Icon = new System.Drawing.Icon("Media/swappy_icon.ico");
+            f.Size = new System.Drawing.Size(670, 200);
+            f.StartPosition = FormStartPosition.CenterParent;
+            f.FormBorderStyle = FormBorderStyle.FixedSingle;
+            f.AutoSize = true;
+            f.AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
+            Game[] games = dbManager.GetAllGames();
+
+            f.Controls.Add(new Label() { Text = "Game:", Location = new System.Drawing.Point(10, 13), AutoSize = true });
+
+            ComboBox cb = new ComboBox() { Location = new System.Drawing.Point(70, 10), Size = new System.Drawing.Size(400, 15) };
+
+            foreach (Game g in games ?? Enumerable.Empty<Game>())
+            {
+                cb.Items.Add(g.Name);
+            }
+
+            f.Controls.Add(new Label() { Text = "Comment: ", Location = new System.Drawing.Point(10, 160), TextAlign=System.Drawing.ContentAlignment.MiddleCenter, AutoSize = true });
+            TextBox textBoxComment = new TextBox() { Location = new System.Drawing.Point(80, 160), Size = new System.Drawing.Size(400, 10) };
+
+            TabControl tc = new TabControl() { Location = new System.Drawing.Point(10, 50), Margin = new Padding(10), Size = new System.Drawing.Size(520, 100) };
+
+            TabPage tabPageDirectory = new TabPage() { Text = "Directory", Name = "tabPageDirector", Size = new System.Drawing.Size(500, 200), UseVisualStyleBackColor = true, Tag = SyncType.Directory };
+            tabPageDirectory.Controls.Add(new Label() { Text = "Directory Location:", Location = new System.Drawing.Point(10, 10), AutoSize = true });
+            TextBox textBoxDirectory = new TextBox() { Location = new System.Drawing.Point(10, 30), Size = new System.Drawing.Size(450, 15) };
+            var buttonDirectory = new System.Windows.Forms.Button() { Text = "...", Location = new System.Drawing.Point(470, 29), Size = new System.Drawing.Size(25, 25) };
+            buttonDirectory.Click += (a, b) =>
+            {
+                FolderBrowserDialog dialog = new FolderBrowserDialog();
+                dialog.ShowNewFolderButton = false;
+
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    textBoxDirectory.Text = dialog.SelectedPath;
+                }
+            };
+
+            tabPageDirectory.Controls.Add(textBoxDirectory);
+            tabPageDirectory.Controls.Add(buttonDirectory);
+
+            TabPage tabPageFile = new TabPage() { Text = "File", Name = "tabPageFile", Size = new System.Drawing.Size(500, 200), UseVisualStyleBackColor = true, Tag = SyncType.File };
+            tabPageFile.Controls.Add(new Label() { Text = "File Location:", Location = new System.Drawing.Point(10, 10), AutoSize = true });
+            TextBox textBoxFile = new TextBox() { Location = new System.Drawing.Point(10, 30), Size = new System.Drawing.Size(450, 15) };
+            var buttonFile = new System.Windows.Forms.Button() { Text = "...", Location = new System.Drawing.Point(470, 29), Size = new System.Drawing.Size(25, 25) };
+            buttonFile.Click += (a, b) =>
+            {
+                OpenFileDialog dialog = new OpenFileDialog();
+                dialog.RestoreDirectory = true;
+                dialog.Multiselect = false;
+
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    textBoxFile.Text = dialog.FileName;
+                }
+            };
+
+            tabPageFile.Controls.Add(textBoxFile);
+            tabPageFile.Controls.Add(buttonFile);
+
+            TabPage tabPageReg = new TabPage() { Text = "Registry Key", Name = "tabPageReg", Size = new System.Drawing.Size(500, 200), UseVisualStyleBackColor = true, Tag = SyncType.RegistryKey };
+            tabPageReg.Controls.Add(new Label() { Text = "Regisry Key Path:", Location = new System.Drawing.Point(10, 10), AutoSize = true });
+            TextBox textBoxReg = new TextBox() { Location = new System.Drawing.Point(10, 30), Size = new System.Drawing.Size(490, 15) };
+
+            tabPageReg.Controls.Add(textBoxReg);
+
+            tc.Controls.Add(tabPageDirectory);
+            tc.Controls.Add(tabPageFile);
+            tc.Controls.Add(tabPageReg);
+
+            var okButton = new System.Windows.Forms.Button() { Text = "OK", Location = new System.Drawing.Point(430, 200), Size = new System.Drawing.Size(100, 30), Margin = new Padding(10) };
+            okButton.Click += (a, b) =>
+            {
+                if (cb.SelectedIndex >= 0)
+                {
+                    SyncType type = (SyncType)tc.SelectedTab.Tag;
+                    string source = null;
+
+                    if (type == SyncType.Directory)
+                    {
+                        if (Directory.Exists(textBoxDirectory.Text))
+                        {
+                            source = textBoxDirectory.Text.Trim(new char[] { '\"', '\\' });
+                        }
+                        else
+                            MessageBox.Show("Given directory does not exist!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                    else if (type == SyncType.File)
+                    {
+                        if (File.Exists(textBoxFile.Text))
+                        {
+                            source = textBoxFile.Text.Trim(new char[] { '\"', '\\' }); ;
+                        }
+                        else
+                            MessageBox.Show("Given file does not exist!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                    else if (type == SyncType.RegistryKey)
+                    {
+                        RegistryKey sourceKey = RegistryHelper.GetKey(textBoxReg.Text.Trim(new char[] { '\"', '\\' }));
+                        if (sourceKey != null)
+                        {
+                            source = textBoxReg.Text.Trim(new char[] { '\"', '\\' });
+                        }
+                        else
+                            MessageBox.Show("Given registry key does not exist!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+
+                    if (!string.IsNullOrEmpty(source))
+                        if (dbManager.AddSyncDefinition(games[cb.SelectedIndex].ID, source, type, textBoxComment.Text))
+                        {
+                            MessageBox.Show("Sync defintion added successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            f.Close();
+                        }
+                        else MessageBox.Show("Error adding sync definition.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    else
+                        MessageBox.Show("Error parsing source string.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+
+                }
+                else MessageBox.Show("No game selected!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            };
+
+            var cancelButton = new System.Windows.Forms.Button() { Text = "Cancel", Location = new System.Drawing.Point(320, 200), Size = new System.Drawing.Size(100, 30), Margin = new Padding(10) };
+            cancelButton.Click += (a, b) => { f.Close(); };
+
+            f.Controls.Add(cb);
+            f.Controls.Add(tc);
+            f.Controls.Add(okButton);
+            f.Controls.Add(cancelButton);
+            f.Controls.Add(textBoxComment);
+
+            f.ShowDialog();
         }
 
         private void addGameButtonAction()
@@ -335,7 +469,6 @@ namespace save_switcher.Panels
             f.Icon = new System.Drawing.Icon("Media/swappy_icon.ico");
             f.Size = new System.Drawing.Size(670, 200);
             f.StartPosition = FormStartPosition.CenterParent;
-            f.BackColor = System.Drawing.Color.White;
             f.FormBorderStyle = FormBorderStyle.FixedSingle;
 
             TextBox textBoxName = new TextBox() { Size = new System.Drawing.Size(500, 12) };
