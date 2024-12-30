@@ -221,6 +221,44 @@ namespace save_switcher
             return true;
         }
 
+        public bool DeleteGame(int gameID)
+        {
+            SQLiteCommand cmd = new SQLiteCommand(string.Format($@"DELETE FROM Games WHERE gameid = @gameID"), connection);
+            cmd.CommandType = System.Data.CommandType.Text;
+            cmd.Parameters.Add(new SQLiteParameter("@gameID", gameID));
+
+            try
+            {
+                cmd.ExecuteNonQuery();
+            }
+            catch (SQLiteException e)
+            {
+
+                return false;
+
+            }
+            return true;
+        }
+
+        public bool DeleteSyncDef(int syncDefID)
+        {
+            SQLiteCommand cmd = new SQLiteCommand(string.Format($@"DELETE FROM SyncDefinitions WHERE syncDefID = @syncDefID"), connection);
+            cmd.CommandType = System.Data.CommandType.Text;
+            cmd.Parameters.Add(new SQLiteParameter("@syncDefID", syncDefID));
+
+            try
+            {
+                cmd.ExecuteNonQuery();
+            }
+            catch (SQLiteException e)
+            {
+
+                return false;
+
+            }
+            return true;
+        }
+
         public bool DeleteUser(int userID)
         {
             SQLiteCommand cmd = new SQLiteCommand(string.Format($@"DELETE FROM Users WHERE userid = @userID"), connection);
