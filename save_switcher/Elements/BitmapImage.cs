@@ -1,12 +1,6 @@
 ﻿using SharpDX.Direct2D1;
 using SharpDX.IO;
 using SharpDX.WIC;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace save_switcher.Elements
 {

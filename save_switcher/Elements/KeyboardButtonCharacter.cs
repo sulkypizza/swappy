@@ -1,6 +1,6 @@
-﻿using SharpDX.Direct2D1;
+﻿using save_switcher.Panels.Subpanels;
 using SharpDX;
-using save_switcher.Panels.Subpanels;
+using SharpDX.Direct2D1;
 using SharpDX.DirectWrite;
 
 namespace save_switcher.Elements

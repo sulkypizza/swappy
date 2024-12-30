@@ -1,19 +1,18 @@
-﻿using SharpDX.Direct2D1;
-using SharpDX;
-using SharpDX.Mathematics.Interop;
-using save_switcher.Elements;
-using SharpDX.WIC;
-using SharpDX.DirectWrite;
-using System;
-using System.Windows.Forms;
-using System.IO;
-using System.Diagnostics;
-using SharpDX.XAudio2;
-using SharpDX.Multimedia;
-using SharpDX.XInput;
-using System.Collections.Generic;
-using SharpDX.Direct2D1.Effects;
+﻿using save_switcher.Elements;
 using save_switcher.Panels.Subpanels;
+using SharpDX;
+using SharpDX.Direct2D1;
+using SharpDX.DirectWrite;
+using SharpDX.Mathematics.Interop;
+using SharpDX.Multimedia;
+using SharpDX.WIC;
+using SharpDX.XAudio2;
+using SharpDX.XInput;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Windows.Forms;
 
 namespace save_switcher.Panels
 {

@@ -1,13 +1,10 @@
 ﻿using save_switcher.Panels.Subpanels;
 using SharpDX;
 using SharpDX.Direct2D1;
-using SharpDX.DirectWrite;
 using SharpDX.XInput;
 using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
-using System.Windows.Input;
-using System.Windows;
 
 namespace save_switcher.Elements
 {

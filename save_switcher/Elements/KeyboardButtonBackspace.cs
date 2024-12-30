@@ -3,7 +3,6 @@ using SharpDX;
 using SharpDX.Direct2D1;
 using SharpDX.Mathematics.Interop;
 using SharpDX.WIC;
-using System.Diagnostics;
 
 namespace save_switcher.Elements
 {

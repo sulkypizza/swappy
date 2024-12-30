@@ -1,6 +1,4 @@
-﻿using System;
-using System.Windows;
-using SharpDX;
+﻿using SharpDX;
 using SharpDX.Direct2D1;
 
 namespace save_switcher.Elements

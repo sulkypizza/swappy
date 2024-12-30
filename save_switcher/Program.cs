@@ -1,18 +1,16 @@
-﻿using SharpDX.Direct2D1;
+﻿using save_switcher.Panels;
+using SharpDX;
+using SharpDX.Direct2D1;
 using SharpDX.Direct3D;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
 using SharpDX.Windows;
-using SharpDX;
 using System;
 using System.Windows.Forms;
-
-using save_switcher.Panels;
-
 using AlphaMode = SharpDX.Direct2D1.AlphaMode;
+using Bitmap = SharpDX.Direct2D1.Bitmap;
 using Device = SharpDX.Direct3D11.Device;
 using PixelFormat = SharpDX.Direct2D1.PixelFormat;
-using Bitmap = SharpDX.Direct2D1.Bitmap;
 
 namespace save_switcher
 {

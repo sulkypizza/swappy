@@ -1,12 +1,7 @@
-﻿using SharpDX.DirectWrite;
-using SharpDX;
+﻿using SharpDX;
+using SharpDX.DirectWrite;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Web;
 
 namespace save_switcher
 {
