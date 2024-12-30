@@ -429,7 +429,7 @@ namespace save_switcher
 
         public Game[] GetAllGames()
         {
-            SQLiteCommand cmd = new SQLiteCommand($@"SELECT gameid, gamename, gamecmd, gameargs FROM Games ORDER BY gameid ASC", connection);
+            SQLiteCommand cmd = new SQLiteCommand($@"SELECT gameid, gamename, gamecmd, gameargs FROM Games ORDER BY gamename ASC", connection);
             cmd.CommandType = System.Data.CommandType.Text;
 
             SQLiteDataReader reader = cmd.ExecuteReader();
