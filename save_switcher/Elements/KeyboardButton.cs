@@ -30,8 +30,6 @@ namespace save_switcher.Elements
 
         private SolidColorBrush colorBrush;
 
-        private TextLayout characterLayout;
-
         protected static Controller[] controllers;
         protected static readonly float deadZone = 0.8f;
         protected static State[] oldControllerState;
@@ -269,7 +267,6 @@ namespace save_switcher.Elements
             parentKeyboard = null;
 
             colorBrush?.Dispose();
-            characterLayout?.Dispose();
         }
     }
 }

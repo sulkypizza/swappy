@@ -66,7 +66,6 @@ namespace save_switcher.Panels
         private long lastProcessCheckTime;
 
         private bool gameProcessFound = true;
-        private Form thisForm;
 
         public RunGame(int? gameId, int userId, DeviceContext deviceContext)
         {
