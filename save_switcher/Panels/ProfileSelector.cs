@@ -1,9 +1,4 @@
-﻿using System;
-using System.IO;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Windows.Input;
-using save_switcher.Elements;
+﻿using save_switcher.Elements;
 using SharpDX;
 using SharpDX.Direct2D1;
 using SharpDX.DirectWrite;
@@ -12,11 +7,11 @@ using SharpDX.Multimedia;
 using SharpDX.WIC;
 using SharpDX.XAudio2;
 using SharpDX.XInput;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Windows.Forms;
-using save_switcher.Imported;
-using Microsoft.Win32.SafeHandles;
-using System.Threading;
-using save_switcher.Panels.Subpanels;
+using System.Windows.Input;
 
 namespace save_switcher.Panels
 {
