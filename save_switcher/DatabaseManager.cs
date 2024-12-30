@@ -106,7 +106,11 @@ namespace save_switcher
             if (!File.Exists(dbLocation))
                 InitializeDB();
 
-            connection = new SQLiteConnection("Data Source=" + dbLocation);
+            SQLiteConnectionStringBuilder builder = new SQLiteConnectionStringBuilder();
+            builder.DataSource = dbLocation;
+            builder.ForeignKeys = true;
+
+            connection = new SQLiteConnection(builder.ToString());
             connection.Open();
         }
 
@@ -121,7 +125,7 @@ namespace save_switcher
                     UNIQUE (gamecmd, gameargs) ),  STRICT;
 
                 CREATE TABLE SyncDefinitions ( syncdefid INTEGER PRIMARY KEY AUTOINCREMENT, gameid INTEGER NOT NULL REFERENCES Games (gameid) 
-                    ON DELETE CASCADE ON UPDATE RESTRICT, syncsource TEXT UNIQUE NOT NULL, type INTEGER NOT NULL, description TEXT,
+                    ON DELETE CASCADE ON UPDATE RESTRICT, syncsource TEXT NOT NULL, type INTEGER NOT NULL, description TEXT,
                     UNIQUE (gameid, syncsource) ) STRICT;
 
                 CREATE TABLE SyncEntry ( syncdefid INTEGER REFERENCES SyncDefinitions (syncdefid) ON DELETE CASCADE ON UPDATE RESTRICT NOT NULL, 
