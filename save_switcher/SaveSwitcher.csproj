@@ -117,7 +117,6 @@
     <Compile Include="Program.cs" />
     <Compile Include="Imported.cs" />
     <Compile Include="DatabaseManager.cs" />
-    <Compile Include="old_Program.cs" />
     <Compile Include="RegistryManager.cs" />
   </ItemGroup>
   <ItemGroup>
