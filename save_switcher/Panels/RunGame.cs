@@ -63,9 +63,8 @@ namespace save_switcher.Panels
         private Stopwatch sw;
         private long lastMilliseconds;
         private long lastControllerReconnectTime;
-        private long lastProcessCheckTime;
 
-        private bool gameProcessFound = true;
+        private bool gameProcessExited = false;
 
         public RunGame(int? gameId, int userId, DeviceContext deviceContext)
         {
@@ -184,6 +183,7 @@ namespace save_switcher.Panels
 
                     Process proc = new Process();
                     proc.StartInfo.FileName = game.Exec;
+                    proc.EnableRaisingEvents = true;
                     proc.StartInfo.WorkingDirectory = Path.GetDirectoryName(game.Exec);
 
                     if (!Equals(game.Args, null))
@@ -191,7 +191,10 @@ namespace save_switcher.Panels
 
                     proc.Start();
 
-                    proc.Exited += (_,__) => { Program.GetProgramForm().BringToFront(); };
+                    proc.Exited += (_,__) => 
+                    {
+                        gameProcessExited = true;
+                    };
 
                 }
                 else
@@ -334,25 +337,6 @@ namespace save_switcher.Panels
             }
         }
 
-        private bool findProcess(string path)
-        {
-            Process[] plist = Process.GetProcesses();
-
-            for (int i = 0; i < plist.Length; i++)
-            {
-                StringBuilder builder = new StringBuilder(Int16.MaxValue);
-
-                IntPtr ptr = Kernel32.OpenProcess(0x00001000, false, plist[i].Id);
-                int wordSize = Int16.MaxValue;
-
-                if (Kernel32.QueryFullProcessImageName(ptr, 0, builder, ref wordSize))
-                    if (builder.ToString().ToLower() == path.ToLower())
-                        return true;
-            }
-
-            return false;
-        }
-
         public void OnMouseDown(System.Windows.Forms.MouseEventArgs e) { }
 
         public void OnMouseWheel(System.Windows.Forms.MouseEventArgs e) { }
@@ -372,25 +356,18 @@ namespace save_switcher.Panels
 
         public void Update()
         {
-            if (sw.ElapsedMilliseconds > lastProcessCheckTime + 5000)
-            {
-                bool oldProcessFound = gameProcessFound;
-
-                gameProcessFound = findProcess(Path.GetFullPath(game.Exec));
-                lastProcessCheckTime = sw.ElapsedMilliseconds;
-
-                if (!gameProcessFound && oldProcessFound)
-                    Kernel32.SetForegroundWindow(Process.GetCurrentProcess().MainWindowHandle);
-            }
-
             Form activeForm = System.Windows.Forms.Form.ActiveForm;
             if (activeForm == null)
+            {
+                if (gameProcessExited == true)
+                    Program.GetProgramForm().Activate();
                 return;
+            }
 
             if (lastControllerReconnectTime + 5000 < sw.ElapsedMilliseconds)
                 reconnectControllers();
 
-            if (!gameProcessFound)
+            if (gameProcessExited)
             {
                 System.Drawing.Point currentMousePos = System.Windows.Forms.Cursor.Position;
                 System.Drawing.Point mouseToScreen = activeForm.PointToClient(currentMousePos);
@@ -520,7 +497,7 @@ namespace save_switcher.Panels
 
             deviceContext.FillRectangle(new RawRectangleF(0, 0, deviceContext.Size.Width, deviceContext.Size.Height), backgroundGradientBrush);
 
-            if (gameProcessFound)
+            if (!gameProcessExited)
             {
                 deviceContext.DrawTextLayout(new RawVector2(deviceContext.Size.Width / 2 - waitTextLayout.MaxWidth / 2, deviceContext.Size.Height / 2 - waitTextLayout.MaxHeight / 2), waitTextLayout, colorBrush);
             }
