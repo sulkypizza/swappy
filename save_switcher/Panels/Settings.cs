@@ -331,6 +331,7 @@ namespace save_switcher.Panels
         {
             Form f = new Form();
             f.Icon = new System.Drawing.Icon("Media/swappy_icon.ico");
+            f.Text = "Add Sync";
             f.Size = new System.Drawing.Size(670, 200);
             f.StartPosition = FormStartPosition.CenterParent;
             f.FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -467,6 +468,7 @@ namespace save_switcher.Panels
         {
             Form f = new Form();
             f.Icon = new System.Drawing.Icon("Media/swappy_icon.ico");
+            f.Text = "Add Game";
             f.Size = new System.Drawing.Size(670, 200);
             f.StartPosition = FormStartPosition.CenterParent;
             f.FormBorderStyle = FormBorderStyle.FixedSingle;
