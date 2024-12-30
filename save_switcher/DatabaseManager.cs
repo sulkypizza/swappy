@@ -214,7 +214,7 @@ namespace save_switcher
             }
             catch (Exception e)
             {
-                MessageBox.Show(e.Message);
+                MessageBox.Show(e.Message + $"\n Arguments: \ngameID: {gameID}, syncSource: {syncSource}, type: {type}");
                 throw (e);
             }
 
