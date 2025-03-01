@@ -2,7 +2,7 @@
 
 namespace save_switcher
 {
-    internal interface Panel
+    internal interface IPanel
     {
         void Resize(DeviceContext deviceContext);
 

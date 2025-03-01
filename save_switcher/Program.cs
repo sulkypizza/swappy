@@ -18,7 +18,7 @@ namespace save_switcher
     {
         public static int? GameID;
 
-        private static Panel currentPanel;
+        private static IPanel currentPanel;
         private static SharpDX.Direct2D1.DeviceContext deviceContext;
         private static SharpDX.DirectWrite.Factory directWriteFactory;
         private static SharpDX.DirectWrite.FontCollection fontCollection;
@@ -233,7 +233,7 @@ namespace save_switcher
             dxgiDevice.Dispose();
         }
 
-        public static void ChangePanel(Panel newPanel)
+        public static void ChangePanel(IPanel newPanel)
         {
             if (currentPanel is IDisposable)
                 ((IDisposable)currentPanel).Dispose();

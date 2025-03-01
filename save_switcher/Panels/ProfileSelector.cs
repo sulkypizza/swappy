@@ -15,7 +15,7 @@ using System.Windows.Input;
 
 namespace save_switcher.Panels
 {
-    class ProfileSelector : Panel, IMouseable
+    class ProfileSelector : IPanel, IMouseable
     {
         private readonly float baseProfilePictureSize = 300;
         private readonly float baseProfilePadding = 100;

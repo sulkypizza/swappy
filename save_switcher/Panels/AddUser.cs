@@ -16,7 +16,7 @@ using System.Windows.Forms;
 
 namespace save_switcher.Panels
 {
-    internal class AddUser : Panel, IMouseable, IKeyboardable
+    internal class AddUser : IPanel, IMouseable, IKeyboardable
     {
         private const float baseProfilePictureSize = 400;
         private const float baseDeleteButtonSize = 150;

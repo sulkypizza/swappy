@@ -10,7 +10,7 @@ using System.Windows.Forms;
 
 namespace save_switcher.Panels
 {
-    internal class Settings : Panel, IDisposable
+    internal class Settings : IPanel, IDisposable
     {
         private DeviceContext deviceContext;
 
