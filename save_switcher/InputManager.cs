@@ -112,7 +112,6 @@ namespace save_switcher
             {
                 CurrentInputType = InputType.Mouse;
 
-                Debug.WriteLine("InvokeEvents DOWN");
                 if (e.Button == MouseButtons.Left)
                     invokeEvents(leftMouseInputEvents, ButtonTravel.Down);
                 else if (e.Button == MouseButtons.Right)
@@ -123,7 +122,6 @@ namespace save_switcher
             {
                 CurrentInputType = InputType.Mouse;
 
-                Debug.WriteLine("InvokeEvents UP");
                 if (e.Button == MouseButtons.Left)
                     invokeEvents(leftMouseInputEvents, ButtonTravel.Up);
                 else if (e.Button == MouseButtons.Right)
@@ -259,11 +257,6 @@ namespace save_switcher
                     var d = (Delegate)e.Target;
                     if (d != null)
                         d.Method.Invoke(d.Target, args);
-
-                    if (d != null)
-                        Debug.WriteLine($"{d.Target.ToString()} {pair.Key} {d.Target.GetHashCode()}");
-                    else
-                        Debug.WriteLine($"d {pair.Key} is null");
                 }
             }
 
