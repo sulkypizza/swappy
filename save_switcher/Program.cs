@@ -63,8 +63,8 @@ namespace save_switcher
             form.WindowState = FormWindowState.Maximized;
 #endif
             form.Show();
+            InputManager.Initialize(form);
             
-
             Device d3dDevice = new Device(DriverType.Hardware, DeviceCreationFlags.BgraSupport);
 
             SharpDX.DXGI.Device dxgiDevice = d3dDevice.QueryInterface<SharpDX.DXGI.Device>();

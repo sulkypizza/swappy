@@ -333,7 +333,7 @@ namespace save_switcher.Panels
                 selectedUserIndex = clamp(selectedUserIndex - 1, 0, users.Length - 1);
         }
 
-        public void Draw(DeviceContext deviceContext)
+        public override void Draw(DeviceContext deviceContext)
         {
             //if we are not the currently active form then do nothing
             if (System.Windows.Forms.Form.ActiveForm == null)
@@ -900,9 +900,9 @@ namespace save_switcher.Panels
                 Dispose();
                 //do the save swapping and start the game
                 if (users.Length > 0)
-                    Program.ChangePanel(new RunGame(Program.GameID, users[selectedUserIndex].User.ID, deviceContext));
+                    Program.ChangePanel<RunGame>(Program.GameID, users[selectedUserIndex].User.ID);
                 else
-                    Program.ChangePanel(new AddUser(deviceContext));
+                    Program.ChangePanel<AddUser>(null);
             }
             else if (currentInputLayer == InputLayers.Utilities)
             {
@@ -910,16 +910,16 @@ namespace save_switcher.Panels
                 {
                     Dispose();
                     //switch to the add user panel
-                    Program.ChangePanel(new AddUser(deviceContext));
+                    Program.ChangePanel<AddUser>(null);
                 }
                 else if (selectedUtilityIndex == 1)
-                    Program.ChangePanel(new Settings(deviceContext));
+                    Program.ChangePanel<Settings>();
             }
             else if (currentInputLayer == InputLayers.EditProfile)
             {
                 //switch to the add user panel to edit a user
                 if (users.Length > 0)
-                    Program.ChangePanel(new AddUser(deviceContext, users[selectedUserIndex].User));
+                    Program.ChangePanel<AddUser>(users[selectedUserIndex].User);
             }
         }
 
