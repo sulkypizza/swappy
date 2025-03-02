@@ -17,6 +17,7 @@ namespace save_switcher
 
         public delegate void ButtonInput(ButtonTravel travel);
         public delegate void PositionChanged(Point position);
+        public delegate void InputDelta(int delta);
 
 
         private static Dictionary<int, WeakReference> leftInputEvents = new Dictionary<int, WeakReference>();
@@ -45,6 +46,12 @@ namespace save_switcher
 
         private static Dictionary<int, WeakReference> rightMouseInputEvents = new Dictionary<int, WeakReference>();
         public static event ButtonInput OnRightMouseInput { add => addEvent(rightMouseInputEvents, value); remove => removeEvent(rightMouseInputEvents, value); }
+
+        private static Dictionary<int, WeakReference> mousePosChanged = new Dictionary<int, WeakReference>();
+        public static event PositionChanged OnMousePosChanged { add => addEvent(mousePosChanged, value); remove => removeEvent(mousePosChanged, value); }
+
+        private static Dictionary<int, WeakReference> mouseScrollChanged = new Dictionary<int, WeakReference>();
+        public static event PositionChanged OnMouseScroll { add => addEvent(mouseScrollChanged, value); remove => removeEvent(mouseScrollChanged, value); }
 
 
         private static Controller[] controllers;
@@ -93,6 +100,18 @@ namespace save_switcher
                 else if (e.Button == MouseButtons.Right)
                     invokeEvents(rightMouseInputEvents, ButtonTravel.Up);
             };
+
+            form.MouseWheel += (object sender, MouseEventArgs e) =>
+            {
+                invokeEvents(mouseScrollChanged, e.Delta);
+            };
+
+            form.MouseMove += (object sender, MouseEventArgs e) =>
+            {
+                invokeEvents(mousePosChanged, e.Location);
+            };
+
+
 
             void invokeKeyInput(KeyEventArgs e, ButtonTravel buttonTravel)
             {
@@ -143,8 +162,6 @@ namespace save_switcher
             };
 
             //form.KeyPress += new System.Windows.Forms.KeyPressEventHandler(OnKeyPress);
-
-            //form.MouseWheel += new System.Windows.Forms.MouseEventHandler(OnMouseWheel);
         }
 
 
