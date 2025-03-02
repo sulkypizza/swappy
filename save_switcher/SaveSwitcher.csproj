@@ -105,6 +105,7 @@
     <Compile Include="Elements\KeyboardButtonSpace.cs" />
     <Compile Include="Elements\KeyboardButtonShift.cs" />
     <Compile Include="Elements\SimpleButton.cs" />
+    <Compile Include="InputManager.cs" />
     <Compile Include="Panels\AddUser.cs" />
     <Compile Include="Panels\IKeyboardable.cs" />
     <Compile Include="Panels\IMouseable.cs" />
