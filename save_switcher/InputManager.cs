@@ -53,6 +53,7 @@ namespace save_switcher
         private static Dictionary<int, WeakReference> mouseScrollChanged = new Dictionary<int, WeakReference>();
         public static event PositionChanged OnMouseScroll { add => addEvent(mouseScrollChanged, value); remove => removeEvent(mouseScrollChanged, value); }
 
+        private static ConditionalWeakTable<object, List<object>> keepAlive = new ConditionalWeakTable<object, List<object>>();
 
         private static Controller[] controllers;
         private static State[] oldControllerState;
@@ -165,10 +166,12 @@ namespace save_switcher
         }
 
 
-        private static void addEvent<T>(IDictionary<int, WeakReference> list, T addEvent)
+        private static void addEvent<T>(IDictionary<int, WeakReference> list, T addEvent) where T : Delegate
         {
-            list.Add(addEvent.GetHashCode(), new WeakReference(addEvent));
+            list.Add(addEvent.Target.GetHashCode(), new WeakReference(addEvent));
+            keepAlive.GetOrCreateValue(addEvent.Target).Add(addEvent);
         }
+
 
         private static void cleanupEvents(IDictionary<int, WeakReference> eventList)
         {
@@ -212,9 +215,11 @@ namespace save_switcher
             oldControllerState = connectedControllersState.ToArray();
         }
 
-        private static void removeEvent<T>(IDictionary<int, WeakReference> list, T addEvent)
+        private static void removeEvent<T>(IDictionary<int, WeakReference> list, T addEvent) where T : Delegate
         {
             list.Remove(addEvent.GetHashCode());
+            keepAlive.TryGetValue(addEvent.Target, out var l);
+            l?.Remove(addEvent);
         }
 
         private static void update()
