@@ -10,7 +10,7 @@ using System.Windows.Forms;
 
 namespace save_switcher.Panels
 {
-    internal class Settings : IPanel, IDisposable
+    internal class Settings : Panel, IDisposable
     {
         private DeviceContext deviceContext;
 
@@ -22,7 +22,7 @@ namespace save_switcher.Panels
 
         private DatabaseManager dbManager;
 
-        public Settings(DeviceContext deviceContext)
+        public override void Initialize(DeviceContext deviceContext, params object[] args)
         {
             Application.EnableVisualStyles(); //TODO: remove this after replacing the windows forms with a custom UI
             this.deviceContext = deviceContext;
@@ -45,7 +45,7 @@ namespace save_switcher.Panels
         public void OnKeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Escape)
-                Program.ChangePanel(new ProfileSelector(deviceContext));
+                Program.ChangePanel<ProfileSelector>();
         }
 
         private void createSizeDependantResources()
@@ -155,20 +155,20 @@ namespace save_switcher.Panels
             addGameButton.Select();
         }
 
-        public void Resize(DeviceContext deviceContext)
+        public override void Resize(DeviceContext deviceContext)
         {
             this.deviceContext = deviceContext;
             createSizeDependantResources();
         }
 
-        public void Update()
+        public override void Update()
         {
             addGameButton.Update();
             addSyncButton.Update();
             listGamesButton.Update();
         }
 
-        public void Draw(DeviceContext deviceContext)
+        public override void Draw(DeviceContext deviceContext)
         {
             deviceContext.BeginDraw();
             deviceContext.Clear(Color.Black);

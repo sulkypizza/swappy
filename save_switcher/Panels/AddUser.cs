@@ -16,7 +16,7 @@ using System.Windows.Forms;
 
 namespace save_switcher.Panels
 {
-    internal class AddUser : IPanel, IMouseable, IKeyboardable
+    internal class AddUser : Panel, IMouseable, IKeyboardable
     {
         private const float baseProfilePictureSize = 400;
         private const float baseDeleteButtonSize = 150;
@@ -58,7 +58,7 @@ namespace save_switcher.Panels
         private LinearGradientBrush backgroundGradientBrush;
         private SolidColorBrush colorBrush;
 
-        private readonly BitmapImage defaultProfileImage;
+        private BitmapImage defaultProfileImage;
         private BitmapImage profileImage;
         private ImageBrush profileBrush;
         private ImagingFactory imagingFactory;
@@ -110,8 +110,8 @@ namespace save_switcher.Panels
             float confirmDeleteYes, float confirmDeleteNo) currentScales;
 
         private bool isShowingConfirmDelete;
-        private readonly bool isEditingUserFlag;
-        private readonly int? editingUserID;
+        private bool isEditingUserFlag;
+        private int? editingUserID;
 
         private (bool leftMouseReleased, bool leftMousePressed) mouseState;
 
@@ -142,8 +142,9 @@ namespace save_switcher.Panels
             ConfirmDeleteNo,
         }
 
-        public AddUser(DeviceContext deviceContext, User editUser = null) 
+        public override void Initialize(DeviceContext deviceContext, params object[] args) 
         {
+            User editUser = args?[0] as User;
             sw = new Stopwatch();
 
             reconnectControllers();
@@ -578,7 +579,7 @@ namespace save_switcher.Panels
                                     //if (Path.GetFullPath(profileFullFileName) != Path.GetFullPath(destination))
                                     //    File.Copy(profileFullFileName, destination, true);
 
-                                    Program.ChangePanel(new ProfileSelector(deviceContext));
+                                    Program.ChangePanel<ProfileSelector>();
                                 }
                                 else if (!isEditingUserFlag)
                                 {
@@ -592,7 +593,7 @@ namespace save_switcher.Panels
 
                                         File.Copy(profileFullFileName, $@"{userDirectory.TrimEnd('\\')}\profile.png");
 
-                                        Program.ChangePanel(new ProfileSelector(deviceContext));
+                                        Program.ChangePanel<ProfileSelector>();
                                     }
                                 }
                             }
@@ -608,7 +609,7 @@ namespace save_switcher.Panels
                         else if (currentSelected.Equals(SelectableElement.Cancel))
                         {
                             playSelectedSound();
-                            Program.ChangePanel(new ProfileSelector(deviceContext));
+                            Program.ChangePanel<ProfileSelector>();
                         }
                         else if (currentSelected.Equals(SelectableElement.Profile))
                         {
@@ -683,7 +684,7 @@ namespace save_switcher.Panels
 
                             if (dbManager.DeleteUser(editingUserID.Value))
                             {
-                                Program.ChangePanel(new ProfileSelector(deviceContext));
+                                Program.ChangePanel<ProfileSelector>();
                             }
                         }
                     }
@@ -698,7 +699,7 @@ namespace save_switcher.Panels
                     else
                     {
                         playSelectedSound();
-                        Program.ChangePanel(new ProfileSelector(deviceContext));
+                        Program.ChangePanel<ProfileSelector>();
                     }
                     break;
 
@@ -839,7 +840,7 @@ namespace save_switcher.Panels
 
         }
 
-        public void Resize(DeviceContext deviceContext)
+        public override void Resize(DeviceContext deviceContext)
         {
             this.deviceContext = deviceContext;
 
@@ -849,7 +850,7 @@ namespace save_switcher.Panels
                 OSKeyboard.Resize(deviceContext);
         }
 
-        public void Update()
+        public override void Update()
         {
             //if we are not the currently active form then do nothing
             Form activeForm = System.Windows.Forms.Form.ActiveForm;
@@ -997,7 +998,7 @@ namespace save_switcher.Panels
 
         }
 
-        public void Draw(DeviceContext deviceContext)
+        public override void Draw(DeviceContext deviceContext)
         {
             //if we are not the currently active form then do nothing
             if (System.Windows.Forms.Form.ActiveForm == null)

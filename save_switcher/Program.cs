@@ -7,6 +7,7 @@ using SharpDX.DXGI;
 using SharpDX.Windows;
 using System;
 using System.Windows.Forms;
+using System.Windows.Input;
 using AlphaMode = SharpDX.Direct2D1.AlphaMode;
 using Bitmap = SharpDX.Direct2D1.Bitmap;
 using Device = SharpDX.Direct3D11.Device;
@@ -18,7 +19,7 @@ namespace save_switcher
     {
         public static int? GameID;
 
-        private static IPanel currentPanel;
+        private static Panel currentPanel;
         private static SharpDX.Direct2D1.DeviceContext deviceContext;
         private static SharpDX.DirectWrite.Factory directWriteFactory;
         private static SharpDX.DirectWrite.FontCollection fontCollection;
@@ -100,7 +101,8 @@ namespace save_switcher
             SolidColorBrush colorBrush = new SolidColorBrush(deviceContext, Color.AliceBlue);
 
             //startup panel
-            currentPanel = new ProfileSelector(deviceContext);
+            currentPanel = new ProfileSelector();
+            currentPanel.Initialize(deviceContext);
 
             form.Resize += (object sender, EventArgs a) => { Draw(); };
 
@@ -233,12 +235,13 @@ namespace save_switcher
             dxgiDevice.Dispose();
         }
 
-        public static void ChangePanel(IPanel newPanel)
+        public static void ChangePanel<T>(params object[] args) where T : Panel, new()
         {
             if (currentPanel is IDisposable)
                 ((IDisposable)currentPanel).Dispose();
 
-            currentPanel = newPanel;
+            currentPanel = new T();
+            currentPanel.Initialize(deviceContext, args);
         }
 
         public static SharpDX.Direct2D1.DeviceContext GetDeviceContext()

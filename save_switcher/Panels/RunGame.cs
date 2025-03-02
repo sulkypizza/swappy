@@ -17,7 +17,7 @@ using System.Windows.Input;
 
 namespace save_switcher.Panels
 {
-    internal class RunGame : IPanel, IMouseable
+    internal class RunGame : Panel, IMouseable
     {
         private const float baseFinalizeButtonSize = 200;
         private const float baseBorderThickness = 5f;
@@ -62,8 +62,11 @@ namespace save_switcher.Panels
 
         private bool gameProcessExited = false;
 
-        public RunGame(int? gameId, int userId, DeviceContext deviceContext)
+        public override void Initialize(DeviceContext deviceContext, params object[] args)
         {
+            int? gameId = args[0] as int?;
+            int userId = (int)args[1];
+
             if(!gameId.HasValue)
                 throw new ArgumentNullException(nameof(gameId));
 
@@ -343,14 +346,14 @@ namespace save_switcher.Panels
                 finalizeButtonProperties.isPressed = true;
         }
 
-        public void Resize(DeviceContext deviceContext)
+        public override void Resize(DeviceContext deviceContext)
         {
             this.deviceContext = deviceContext;
 
             createSizeDependantResources(deviceContext);
         }
 
-        public void Update()
+        public override void Update()
         {
             Form activeForm = System.Windows.Forms.Form.ActiveForm;
             if (activeForm == null)
@@ -474,7 +477,7 @@ namespace save_switcher.Panels
             
         }
 
-        public void Draw(DeviceContext deviceContext)
+        public override void Draw(DeviceContext deviceContext)
         {
             if (!sw.IsRunning)
             {

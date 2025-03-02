@@ -108,7 +108,7 @@
     <Compile Include="Panels\AddUser.cs" />
     <Compile Include="Panels\IKeyboardable.cs" />
     <Compile Include="Panels\IMouseable.cs" />
-    <Compile Include="Panels\IPanel.cs" />
+    <Compile Include="Panels\Panel.cs" />
     <Compile Include="Panels\ProfileSelector.cs" />
     <Compile Include="Panels\RunGame.cs" />
     <Compile Include="Panels\Settings.cs" />
