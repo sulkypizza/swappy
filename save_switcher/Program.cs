@@ -240,8 +240,12 @@ namespace save_switcher
             if (currentPanel is IDisposable)
                 ((IDisposable)currentPanel).Dispose();
 
+            InputManager.RemoveEventsFromObject(currentPanel);
+
             currentPanel = new T();
             currentPanel.Initialize(deviceContext, args);
+
+            InputManager.CleanupNullEvents();
         }
 
         public static SharpDX.Direct2D1.DeviceContext GetDeviceContext()

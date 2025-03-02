@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Drawing;
 using System.Windows.Forms;
+using System.Linq;
 
 namespace save_switcher
 {
@@ -16,51 +17,76 @@ namespace save_switcher
             Down,
         }
 
+        public enum InputType
+        {
+            Mouse,
+            Keyboard,
+            Controller,
+        }
+
+        public static InputType CurrentInputType { get; private set; }
+
         public delegate void ButtonInput(ButtonTravel travel);
         public delegate void PositionChanged(Point position);
         public delegate void InputDelta(int delta);
 
 
-        private static Dictionary<int, WeakReference> leftInputEvents = new Dictionary<int, WeakReference>();
+        private static Dictionary<int, List<WeakReference>> leftInputEvents = new Dictionary<int, List<WeakReference>>();
         public static event ButtonInput OnLeftInput { add => addEvent(leftInputEvents, value); remove => removeEvent(leftInputEvents, value); }
 
-        private static Dictionary<int, WeakReference> rightInputEvents = new Dictionary<int, WeakReference>();
+        private static Dictionary<int, List<WeakReference>> rightInputEvents = new Dictionary<int, List<WeakReference>>();
         public static event ButtonInput OnRightInput { add => addEvent(rightInputEvents, value); remove => removeEvent(rightInputEvents, value); }
 
-        private static Dictionary<int, WeakReference> upInputEvents = new Dictionary<int, WeakReference>();
+        private static Dictionary<int, List<WeakReference>> upInputEvents = new Dictionary<int, List<WeakReference>>();
         public static event ButtonInput OnUpInput { add => addEvent(upInputEvents, value); remove => removeEvent(upInputEvents, value); }
 
-        private static Dictionary<int, WeakReference> downInputEvents = new Dictionary<int, WeakReference>();
+        private static Dictionary<int, List<WeakReference>> downInputEvents = new Dictionary<int, List<WeakReference>>();
         public static event ButtonInput OnDownInput { add => addEvent(downInputEvents, value); remove => removeEvent(downInputEvents, value); }
 
-        private static Dictionary<int, WeakReference> enterInputEvents = new Dictionary<int, WeakReference>();
+        private static Dictionary<int, List<WeakReference>> enterInputEvents = new Dictionary<int, List<WeakReference>>();
         public static event ButtonInput OnEnterInput { add => addEvent(enterInputEvents, value); remove => removeEvent(enterInputEvents, value); }
 
-        private static Dictionary<int, WeakReference> altEnterInputEvents = new Dictionary<int, WeakReference>();
+        private static Dictionary<int, List<WeakReference>> altEnterInputEvents = new Dictionary<int, List<WeakReference>>();
         public static event ButtonInput OnAltEnterInput { add => addEvent(altEnterInputEvents, value); remove => removeEvent(altEnterInputEvents, value); }
 
-        private static Dictionary<int, WeakReference> backInputEvents = new Dictionary<int, WeakReference>();
+        private static Dictionary<int, List<WeakReference>> backInputEvents = new Dictionary<int, List<WeakReference>>();
         public static event ButtonInput OnBackInput { add => addEvent(backInputEvents, value); remove => removeEvent(backInputEvents, value); }
 
-        private static Dictionary<int, WeakReference> leftMouseInputEvents = new Dictionary<int, WeakReference>();
+        private static Dictionary<int, List<WeakReference>> leftMouseInputEvents = new Dictionary<int, List<WeakReference>>();
         public static event ButtonInput OnLeftMouseInput { add => addEvent(leftMouseInputEvents, value); remove => removeEvent(leftMouseInputEvents, value); }
 
-        private static Dictionary<int, WeakReference> rightMouseInputEvents = new Dictionary<int, WeakReference>();
+        private static Dictionary<int, List<WeakReference>> rightMouseInputEvents = new Dictionary<int, List<WeakReference>>();
         public static event ButtonInput OnRightMouseInput { add => addEvent(rightMouseInputEvents, value); remove => removeEvent(rightMouseInputEvents, value); }
 
-        private static Dictionary<int, WeakReference> mousePosChanged = new Dictionary<int, WeakReference>();
+        private static Dictionary<int, List<WeakReference>> mousePosChanged = new Dictionary<int, List<WeakReference>>();
         public static event PositionChanged OnMousePosChanged { add => addEvent(mousePosChanged, value); remove => removeEvent(mousePosChanged, value); }
 
-        private static Dictionary<int, WeakReference> mouseScrollChanged = new Dictionary<int, WeakReference>();
-        public static event PositionChanged OnMouseScroll { add => addEvent(mouseScrollChanged, value); remove => removeEvent(mouseScrollChanged, value); }
+        private static Dictionary<int, List<WeakReference>> mouseScrollChanged = new Dictionary<int, List<WeakReference>>();
+        public static event InputDelta OnMouseScroll { add => addEvent(mouseScrollChanged, value); remove => removeEvent(mouseScrollChanged, value); }
 
         private static ConditionalWeakTable<object, List<object>> keepAlive = new ConditionalWeakTable<object, List<object>>();
+        private static List<Dictionary<int, List<WeakReference>>> allEventLists;
 
         private static Controller[] controllers;
         private static State[] oldControllerState;
 
         static InputManager()
         {
+            allEventLists = new List<Dictionary<int, List<WeakReference>>>()
+            {
+                leftInputEvents,
+                rightInputEvents,
+                upInputEvents,
+                downInputEvents,
+                enterInputEvents,
+                altEnterInputEvents,
+                backInputEvents,
+                leftMouseInputEvents,
+                rightMouseInputEvents,
+                mousePosChanged,
+                mouseScrollChanged,
+            };
+
             Timer timer = new Timer() { Interval = 250 };
             timer.Tick += (_,__) => { update(); };
             timer.Start();
@@ -74,21 +100,19 @@ namespace save_switcher
 
         public static void CleanupNullEvents()
         {
-            cleanupEvents(leftInputEvents);
-            cleanupEvents(rightInputEvents);
-            cleanupEvents(downInputEvents);
-            cleanupEvents(upInputEvents);
-            cleanupEvents(enterInputEvents);
-            cleanupEvents(altEnterInputEvents);
-            cleanupEvents(backInputEvents);
-            cleanupEvents(leftMouseInputEvents);
-            cleanupEvents(rightMouseInputEvents);
+            foreach (var list in allEventLists)
+            {
+                cleanupEvents(list);
+            }
         }
 
         public static void Initialize(Form form)
         {
             form.MouseDown += (object sender, MouseEventArgs e) =>
             {
+                CurrentInputType = InputType.Mouse;
+
+                Debug.WriteLine("InvokeEvents DOWN");
                 if (e.Button == MouseButtons.Left)
                     invokeEvents(leftMouseInputEvents, ButtonTravel.Down);
                 else if (e.Button == MouseButtons.Right)
@@ -97,6 +121,9 @@ namespace save_switcher
 
             form.MouseUp += (object sender, MouseEventArgs e) =>
             {
+                CurrentInputType = InputType.Mouse;
+
+                Debug.WriteLine("InvokeEvents UP");
                 if (e.Button == MouseButtons.Left)
                     invokeEvents(leftMouseInputEvents, ButtonTravel.Up);
                 else if (e.Button == MouseButtons.Right)
@@ -105,11 +132,13 @@ namespace save_switcher
 
             form.MouseWheel += (object sender, MouseEventArgs e) =>
             {
+                CurrentInputType = InputType.Mouse;
                 invokeEvents(mouseScrollChanged, e.Delta);
             };
 
             form.MouseMove += (object sender, MouseEventArgs e) =>
             {
+                CurrentInputType = InputType.Mouse;
                 invokeEvents(mousePosChanged, e.Location);
             };
 
@@ -117,7 +146,7 @@ namespace save_switcher
 
             void invokeKeyInput(KeyEventArgs e, ButtonTravel buttonTravel)
             {
-                IDictionary<int, WeakReference> list = null;
+                IDictionary<int, List<WeakReference>> list = null;
                 switch (e.KeyCode)
                 {
                     case Keys.Left:
@@ -150,47 +179,94 @@ namespace save_switcher
                 }
 
                 if (list != null)
-                    invokeEvents(list, ButtonTravel.Down);
+                    invokeEvents(list, buttonTravel);
             }
 
             form.KeyDown += (object sender, KeyEventArgs e) =>
             {
+                CurrentInputType = InputType.Keyboard;
                 invokeKeyInput(e, ButtonTravel.Down);
             };
 
             form.KeyUp += (object sender, KeyEventArgs e) =>
             {
+                CurrentInputType = InputType.Keyboard;
                 invokeKeyInput(e, ButtonTravel.Up);
             };
 
             //form.KeyPress += new System.Windows.Forms.KeyPressEventHandler(OnKeyPress);
         }
 
-
-        private static void addEvent<T>(IDictionary<int, WeakReference> list, T addEvent) where T : Delegate
+        public static void RemoveEventsFromObject(object obj)
         {
-            list.Add(addEvent.Target.GetHashCode(), new WeakReference(addEvent));
+            foreach(var list in allEventLists)
+            {
+                list.Remove(obj.GetHashCode());
+            }
+        }
+
+
+        private static void addEvent<T>(IDictionary<int, List<WeakReference>> list, T addEvent) where T : Delegate
+        {
+            List<WeakReference> eventList;
+            if (!list.TryGetValue(addEvent.Target.GetHashCode(), out eventList))
+                list.Add(addEvent.Target.GetHashCode(), new List<WeakReference>() { new WeakReference(addEvent) });
+            else
+                eventList.Add(new WeakReference(addEvent));
+
             keepAlive.GetOrCreateValue(addEvent.Target).Add(addEvent);
         }
 
 
-        private static void cleanupEvents(IDictionary<int, WeakReference> eventList)
+        private static void cleanupEvents(IDictionary<int, List<WeakReference>> eventList)
         {
-            foreach(var pair in eventList)
+            List<int> removeParent = new List<int>();
+
+            foreach (var list in eventList)
             {
-                if(pair.Value.Target == null)
-                    eventList.Remove(pair.Key);
+                List<WeakReference> removeEvent = new List<WeakReference>();
+
+                foreach (var item in list.Value)
+                {
+                    if(item.Target == null)
+                        removeEvent.Add(item);
+                }
+
+                foreach (var item in removeEvent)
+                {
+                    list.Value.Remove(item);
+                }
+
+                if(list.Value.Count == 0)
+                    removeParent.Add(list.Key);
             }
+
+            foreach(var removeEvent in removeParent)
+            {
+                eventList.Remove(removeEvent);
+            }
+
         }
 
-        private static void invokeEvents(IDictionary<int, WeakReference> eventList, params object[] args)
+        private static void invokeEvents(IDictionary<int, List<WeakReference>> eventList, params object[] args)
         {
-            foreach (var pair in eventList)
+            var list = eventList.ToList();
+
+            foreach (var pair in list)
             {
-                var d = (Delegate)pair.Value.Target;
-                if (d != null)
-                    d.Method.Invoke(d.Target, args);
+                foreach (var e in pair.Value)
+                {
+                    var d = (Delegate)e.Target;
+                    if (d != null)
+                        d.Method.Invoke(d.Target, args);
+
+                    if (d != null)
+                        Debug.WriteLine($"{d.Target.ToString()} {pair.Key} {d.Target.GetHashCode()}");
+                    else
+                        Debug.WriteLine($"d {pair.Key} is null");
+                }
             }
+
         }
 
         private static void reconnectControllers()
@@ -216,9 +292,17 @@ namespace save_switcher
             oldControllerState = connectedControllersState.ToArray();
         }
 
-        private static void removeEvent<T>(IDictionary<int, WeakReference> list, T addEvent) where T : Delegate
+        private static void removeEvent<T>(IDictionary<int, List<WeakReference>> list, T addEvent) where T : Delegate
         {
-            list.Remove(addEvent.GetHashCode());
+            List<WeakReference> eventList;
+            if (list.TryGetValue(addEvent.Target.GetHashCode(), out eventList))
+                foreach (WeakReference e in eventList)
+                {
+                    if (e.Target != null)
+                        if (((Delegate)e.Target).Method.GetHashCode() == addEvent.Method.GetHashCode())
+                            eventList.Remove(e);
+                }
+
             keepAlive.TryGetValue(addEvent.Target, out var l);
             l?.Remove(addEvent);
         }
@@ -239,40 +323,47 @@ namespace save_switcher
                     if (((float)currentControllerState.Gamepad.LeftThumbX / short.MaxValue > controllerDeadZone && ((float)compareState.Gamepad.LeftThumbX / short.MaxValue) < controllerDeadZone) ||
                             (currentControllerState.Gamepad.Buttons & GamepadButtonFlags.DPadRight) == GamepadButtonFlags.DPadRight && (compareState.Gamepad.Buttons & GamepadButtonFlags.DPadRight) == 0)
                     {
+                        CurrentInputType = InputType.Controller;
                         invokeEvents(leftInputEvents, ButtonTravel.Down);
                     }
                     //same for this one except for left
                     else if (((float)currentControllerState.Gamepad.LeftThumbX / short.MaxValue * -1f > controllerDeadZone && (float)compareState.Gamepad.LeftThumbX / short.MaxValue * -1f < controllerDeadZone) ||
                         (currentControllerState.Gamepad.Buttons & GamepadButtonFlags.DPadLeft) == GamepadButtonFlags.DPadLeft && (compareState.Gamepad.Buttons & GamepadButtonFlags.DPadLeft) == 0)
                     {
+                        CurrentInputType = InputType.Controller;
                         invokeEvents(rightInputEvents, ButtonTravel.Down);
                     }
                     //and for down
                     else if (((float)currentControllerState.Gamepad.LeftThumbY / short.MaxValue * -1f > controllerDeadZone && (float)compareState.Gamepad.LeftThumbY / short.MaxValue * -1f < controllerDeadZone) ||
                         (currentControllerState.Gamepad.Buttons & GamepadButtonFlags.DPadDown) == GamepadButtonFlags.DPadDown && (compareState.Gamepad.Buttons & GamepadButtonFlags.DPadDown) == 0)
                     {
+                        CurrentInputType = InputType.Controller;
                         invokeEvents(downInputEvents, ButtonTravel.Down);
                     }
                     //and for up
                     else if (((float)currentControllerState.Gamepad.LeftThumbY / short.MaxValue > controllerDeadZone && (float)compareState.Gamepad.LeftThumbY / short.MaxValue < controllerDeadZone) ||
                         (currentControllerState.Gamepad.Buttons & GamepadButtonFlags.DPadUp) == GamepadButtonFlags.DPadUp && (compareState.Gamepad.Buttons & GamepadButtonFlags.DPadUp) == 0)
                     {
+                        CurrentInputType = InputType.Controller;
                         invokeEvents(upInputEvents, ButtonTravel.Down);
                     }
                     //see if the 'A' or 'X' button was pressed this frame
                     else if (((currentControllerState.Gamepad.Buttons & GamepadButtonFlags.A) == GamepadButtonFlags.A || (currentControllerState.Gamepad.Buttons & GamepadButtonFlags.X) == GamepadButtonFlags.X) &&
                         (compareState.Gamepad.Buttons & (GamepadButtonFlags.X | GamepadButtonFlags.A)) == 0)
                     {
+                        CurrentInputType = InputType.Controller;
                         invokeEvents(enterInputEvents, ButtonTravel.Down);
                     }
                     //see if the 'Y' button was pressed this frame
                     else if ((currentControllerState.Gamepad.Buttons & GamepadButtonFlags.Y) == GamepadButtonFlags.Y && (compareState.Gamepad.Buttons & GamepadButtonFlags.Y) == 0)
                     {
+                        CurrentInputType = InputType.Controller;
                         invokeEvents(altEnterInputEvents, ButtonTravel.Down);
                     }
                     //see if the 'B' button was pressed this frame
                     else if ((currentControllerState.Gamepad.Buttons & GamepadButtonFlags.B) == GamepadButtonFlags.B && (compareState.Gamepad.Buttons & GamepadButtonFlags.B) == 0)
                     {
+                        CurrentInputType = InputType.Controller;
                         invokeEvents(backInputEvents, ButtonTravel.Down);
                     }
 
