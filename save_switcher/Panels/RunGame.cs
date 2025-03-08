@@ -7,17 +7,14 @@ using SharpDX.Mathematics.Interop;
 using SharpDX.Multimedia;
 using SharpDX.WIC;
 using SharpDX.XAudio2;
-using SharpDX.XInput;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Forms;
-using System.Windows.Input;
 
 namespace save_switcher.Panels
 {
-    internal class RunGame : Panel, IMouseable
+    internal class RunGame : Panel
     {
         private const float baseFinalizeButtonSize = 200;
         private const float baseBorderThickness = 5f;
@@ -35,7 +32,7 @@ namespace save_switcher.Panels
         private Ellipse finalizeButton;
         private float finalizeButtonSize;
         private float borderThickness;
-        private (float scale, bool isPressed, bool isMouseOver) finalizeButtonProperties;
+        private (float scale, bool isMouseOver) finalizeButtonProperties;
 
         private BitmapImage checkmarkImage;
 
@@ -47,10 +44,6 @@ namespace save_switcher.Panels
         private TextLayout waitTextLayout;
         private TextLayout pressButtonLayout;
 
-        private Vector2 oldMousePos;
-        private Controller[] controllers;
-        private State[] oldControllerState;
-
         private XAudio2 audioOut;
         private SoundStream profileClickStream;
         private AudioBuffer selectionClickBuffer;
@@ -58,7 +51,6 @@ namespace save_switcher.Panels
 
         private Stopwatch sw;
         private long lastMilliseconds;
-        private long lastControllerReconnectTime;
 
         private bool gameProcessExited = false;
 
@@ -82,8 +74,6 @@ namespace save_switcher.Panels
             user = databaseManager.GetUser(userId);
             game = databaseManager.GetGame(gameId.Value);
 
-            reconnectControllers();
-
             //set up audio effects
             audioOut = new XAudio2();
             MasteringVoice voice = new MasteringVoice(audioOut);
@@ -100,7 +90,7 @@ namespace save_switcher.Panels
 
             colorBrush = new SolidColorBrush(deviceContext, Color.White);
 
-            finalizeButtonProperties = (1f, false, false);
+            finalizeButtonProperties = (1f, false);
 
             ImagingFactory imagingFactory = new ImagingFactory();
             checkmarkImage = new BitmapImage("Media/checkmark.png", deviceContext, imagingFactory);
@@ -193,6 +183,10 @@ namespace save_switcher.Panels
                     proc.Exited += (_,__) => 
                     {
                         gameProcessExited = true;
+
+                        Program.GetProgramForm().Invoke(
+                            new Action( () => { Program.GetProgramForm().Activate(); } 
+                        ));
                     };
 
                 }
@@ -210,6 +204,37 @@ namespace save_switcher.Panels
                 MessageBox.Show($"Error: User {inputs.userId} does not exist!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 Application.Exit();
             }
+
+            InputManager.OnEnterInput += inputEnter;
+            InputManager.OnMousePosChanged += inputMousePosChanged;
+            InputManager.OnLeftMouseInput += inputLeftMouseInput;
+        }
+
+        private void inputEnter(InputManager.ButtonTravel travel)
+        {
+            if(gameProcessExited)
+                finalize();
+        }
+
+        private void inputLeftMouseInput(InputManager.ButtonTravel travel)
+        {
+            if (gameProcessExited && finalizeButtonProperties.isMouseOver)
+                finalize();
+        }
+
+        private void inputMousePosChanged(System.Drawing.Point p)
+        {
+            Vector2 mousePos = new Vector2(p.X, p.Y);
+            if (Vector2.DistanceSquared(mousePos, new Vector2(finalizeButton.Point.X, finalizeButton.Point.Y)) < finalizeButtonSize / 2 * finalizeButtonProperties.scale * (finalizeButtonSize / 2 * finalizeButtonProperties.scale))
+            {
+                if (!finalizeButtonProperties.isMouseOver)
+                    playSelectedSound();
+
+                finalizeButtonProperties.isMouseOver = true;
+            }
+            else
+                finalizeButtonProperties.isMouseOver = false;
+
         }
 
         private void createSizeDependantResources(DeviceContext deviceContext)
@@ -266,31 +291,6 @@ namespace save_switcher.Panels
             finalizeButton = new Ellipse(new Vector2(deviceContext.Size.Width / 2, deviceContext.Size.Height / 4 * 3), finalizeButtonSize / 2, finalizeButtonSize / 2);
         }
 
-        private void reconnectControllers()
-        {
-            List<Controller> connectedControllers = new List<Controller>();
-            List<State> connectedControllersState = new List<State>();
-
-            //for each controller that is connected, save it into the list
-            for (int i = 0; i < 4; i++)
-            {
-                Controller testController = new Controller((UserIndex)i - 1);
-
-
-                if (testController.IsConnected)
-                {
-                    connectedControllers.Add(testController);
-                    connectedControllersState.Add(testController.GetState());
-                }
-            }
-
-            //use those lists to populate these arrays
-            controllers = connectedControllers.ToArray();
-            oldControllerState = connectedControllersState.ToArray();
-
-            lastControllerReconnectTime = sw.ElapsedMilliseconds;
-        }
-
         private void playSelectedSound()
         {
             selectionClickVoice = new SourceVoice(audioOut, profileClickStream.Format, false);
@@ -336,16 +336,6 @@ namespace save_switcher.Panels
             }
         }
 
-        public void OnMouseDown(System.Windows.Forms.MouseEventArgs e) { }
-
-        public void OnMouseWheel(System.Windows.Forms.MouseEventArgs e) { }
-
-        public void OnMouseUp(System.Windows.Forms.MouseEventArgs e) 
-        {
-            if (finalizeButtonProperties.isMouseOver)
-                finalizeButtonProperties.isPressed = true;
-        }
-
         public override void Resize(DeviceContext deviceContext)
         {
             this.deviceContext = deviceContext;
@@ -353,128 +343,63 @@ namespace save_switcher.Panels
             createSizeDependantResources(deviceContext);
         }
 
-        public override void Update()
+        private void finalize()
         {
-            Form activeForm = System.Windows.Forms.Form.ActiveForm;
-            if (activeForm == null)
+            Sync[] syncs2 = databaseManager.GetUserSyncs(game.ID, user.ID);
+
+            foreach (Sync sync in syncs2)
             {
-                if (gameProcessExited == true)
-                    Program.GetProgramForm().Activate();
-                return;
+                if (sync.Type == SyncType.Directory)
+                {
+                    if (Directory.Exists(sync.ApplicationLocation))
+                        Directory.Move(sync.ApplicationLocation, $"{sync.ApplicationLocation}_{DateTime.UtcNow.Ticks}");
+
+                    copyDirectory(sync.GameLocation, sync.ApplicationLocation);
+
+                    Directory.Delete(sync.GameLocation, true);
+                    Directory.Move(sync.GameLocation.Trim('\\') + "_temp", sync.GameLocation);
+                }
+                else if (sync.Type == SyncType.File)
+                {
+                    if (File.Exists(sync.ApplicationLocation))
+                        File.Move(sync.ApplicationLocation, $"{sync.ApplicationLocation}_{DateTime.UtcNow.Ticks}");
+
+                    File.Copy(sync.GameLocation, sync.ApplicationLocation, false);
+
+                    File.Delete(sync.GameLocation);
+                    File.Move(sync.GameLocation.Trim('\\') + "_temp", sync.GameLocation);
+                }
+                else if (sync.Type == SyncType.RegistryKey)
+                {
+                    if (Directory.Exists(sync.ApplicationLocation))
+                        Directory.Move(sync.ApplicationLocation, $"{sync.ApplicationLocation}_{DateTime.UtcNow.Ticks}");
+
+                    if (!Directory.Exists(sync.ApplicationLocation))
+                        Directory.CreateDirectory(sync.ApplicationLocation);
+
+                    RegistryHelper.WriteRegistryKeyToFile(RegistryHelper.GetKey(sync.GameLocation), sync.ApplicationLocation);
+
+                    if (RegistryHelper.GetKey(sync.GameLocation) != null)
+                    {
+                        RegistryHelper.DeleteRegistryKey(RegistryHelper.GetKey(sync.GameLocation));
+
+                        if (RegistryHelper.GetKey(sync.GameLocation + "_temp") != null)
+                        {
+                            RegistryHelper.CreateRegistryKey(sync.GameLocation);
+                            RegistryHelper.CopyRegistryKey(RegistryHelper.GetKey(sync.GameLocation + "_temp"), RegistryHelper.GetKey(sync.GameLocation));
+
+                            RegistryHelper.DeleteRegistryKey(RegistryHelper.GetKey(sync.GameLocation + "_temp"));
+                        }
+                    }
+                }
+
+                int syncDefId = databaseManager.GetSyncDefID(game.ID, sync.GameLocation, sync.Type);
+
+                if (syncDefId >= 0)
+                    databaseManager.UpdateUserSync(user.ID, syncDefId);
             }
 
-            if (lastControllerReconnectTime + 5000 < sw.ElapsedMilliseconds)
-                reconnectControllers();
-
-            if (gameProcessExited)
-            {
-                System.Drawing.Point currentMousePos = System.Windows.Forms.Cursor.Position;
-                System.Drawing.Point mouseToScreen = activeForm.PointToClient(currentMousePos);
-                Vector2 mousePos = new Vector2(mouseToScreen.X, mouseToScreen.Y);
-
-                if (mousePos != oldMousePos)
-                {
-                    if (Vector2.DistanceSquared(mousePos, new Vector2(finalizeButton.Point.X, finalizeButton.Point.Y)) < finalizeButtonSize / 2 * finalizeButtonProperties.scale * (finalizeButtonSize / 2 * finalizeButtonProperties.scale))
-                    {
-                        if (!finalizeButtonProperties.isMouseOver)
-                            playSelectedSound();
-
-                        finalizeButtonProperties.isMouseOver = true;
-
-                    }
-                    else
-                        finalizeButtonProperties.isMouseOver = false;
-                }
-
-                oldMousePos = mousePos;
-
-                if (Keyboard.IsKeyDown(Key.Enter))
-                {
-                    finalizeButtonProperties.isPressed = true;
-                }
-
-
-                //controller input
-
-                for (int controller = 0; controller < controllers.Length; controller++)
-                {
-                    if (controllers[controller].IsConnected)
-                    {
-                        State currentControllerState = controllers[controller].GetState();
-                        State compareState = oldControllerState[controller];
-
-                        if (((currentControllerState.Gamepad.Buttons & GamepadButtonFlags.A) == GamepadButtonFlags.A || (currentControllerState.Gamepad.Buttons & GamepadButtonFlags.X) == GamepadButtonFlags.X) &&
-                            (compareState.Gamepad.Buttons & (GamepadButtonFlags.X | GamepadButtonFlags.A)) == 0)
-                        {
-                            finalizeButtonProperties.isPressed = true;
-                        }
-
-                        oldControllerState[controller] = currentControllerState;
-                    }
-                }
-
-
-                if (finalizeButtonProperties.isPressed)
-                {
-                    Sync[] syncs2 = databaseManager.GetUserSyncs(game.ID, user.ID);
-
-                    foreach (Sync sync in syncs2)
-                    {
-                        if (sync.Type == SyncType.Directory)
-                        {
-                            if (Directory.Exists(sync.ApplicationLocation))
-                                Directory.Move(sync.ApplicationLocation, $"{sync.ApplicationLocation}_{DateTime.UtcNow.Ticks}");
-
-                            copyDirectory(sync.GameLocation, sync.ApplicationLocation);
-
-                            Directory.Delete(sync.GameLocation, true);
-                            Directory.Move(sync.GameLocation.Trim('\\') + "_temp", sync.GameLocation);
-                        }
-                        else if (sync.Type == SyncType.File)
-                        {
-                            if (File.Exists(sync.ApplicationLocation))
-                                File.Move(sync.ApplicationLocation, $"{sync.ApplicationLocation}_{DateTime.UtcNow.Ticks}");
-
-                            File.Copy(sync.GameLocation, sync.ApplicationLocation, false);
-
-                            File.Delete(sync.GameLocation);
-                            File.Move(sync.GameLocation.Trim('\\') + "_temp", sync.GameLocation);
-                        }
-                        else if (sync.Type == SyncType.RegistryKey)
-                        {
-                            if (Directory.Exists(sync.ApplicationLocation))
-                                Directory.Move(sync.ApplicationLocation, $"{sync.ApplicationLocation}_{DateTime.UtcNow.Ticks}");
-                            
-                            if(!Directory.Exists(sync.ApplicationLocation))
-                                Directory.CreateDirectory(sync.ApplicationLocation);
-
-                            RegistryHelper.WriteRegistryKeyToFile(RegistryHelper.GetKey(sync.GameLocation), sync.ApplicationLocation);
-
-                            if (RegistryHelper.GetKey(sync.GameLocation) != null)
-                            {
-                                RegistryHelper.DeleteRegistryKey(RegistryHelper.GetKey(sync.GameLocation));
-
-                                if (RegistryHelper.GetKey(sync.GameLocation + "_temp") != null)
-                                {
-                                    RegistryHelper.CreateRegistryKey(sync.GameLocation);
-                                    RegistryHelper.CopyRegistryKey(RegistryHelper.GetKey(sync.GameLocation + "_temp"), RegistryHelper.GetKey(sync.GameLocation));
-
-                                    RegistryHelper.DeleteRegistryKey(RegistryHelper.GetKey(sync.GameLocation + "_temp"));
-                                }
-                            }
-                        }
-
-                        int syncDefId = databaseManager.GetSyncDefID(game.ID, sync.GameLocation, sync.Type);
-
-                        if (syncDefId >= 0)
-                            databaseManager.UpdateUserSync(user.ID, syncDefId);
-                    }
-
-                    Application.Exit();
-                    //changePanelCallback(new ProfileSelector(deviceContext, changePanelCallback));
-                }
-            }
-            
+            Application.Exit();
         }
 
         public override void Draw(DeviceContext deviceContext)
