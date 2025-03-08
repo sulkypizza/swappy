@@ -31,21 +31,15 @@ namespace save_switcher.Panels
 
             createSizeDependantResources();
 
-            Program.GetProgramForm().KeyDown += OnKeyDown;
+            InputManager.OnBackInput += inputBack;
         }
 
         public void Dispose()
         {
-            Program.GetProgramForm().KeyDown -= OnKeyDown;
+            InputManager.RemoveEventsFromObject(this);
 
             addGameButton.Dispose();
             addSyncButton.Dispose();
-        }
-
-        public void OnKeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.KeyCode == Keys.Escape)
-                Program.ChangePanel<ProfileSelector>();
         }
 
         private void createSizeDependantResources()
@@ -535,6 +529,14 @@ namespace save_switcher.Panels
             f.Controls.Add(cancelButton);
 
             f.ShowDialog();
+        }
+
+        private void inputBack(InputManager.ButtonTravel travel)
+        {
+            if (travel == InputManager.ButtonTravel.Down)
+            {
+                Program.ChangePanel<ProfileSelector>();
+            }
         }
     }
 }
