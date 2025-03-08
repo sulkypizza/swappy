@@ -16,7 +16,7 @@ using System.Windows.Forms;
 
 namespace save_switcher.Panels
 {
-    internal class AddUser : Panel, IMouseable, IKeyboardable
+    internal class AddUser : Panel, IDisposable
     {
         private const float baseProfilePictureSize = 400;
         private const float baseDeleteButtonSize = 150;
@@ -37,13 +37,8 @@ namespace save_switcher.Panels
 
         private Stopwatch sw;
         private float lastMilliseconds;
-        private long lastControllerReconnectTime;
-
-        private Controller[] controllers;
-        private State[] oldControllerState;
-        private readonly float deadZone = 0.8f;
-        private Vector2 oldMousePos;
         private SelectableElement currentSelected = SelectableElement.None;
+        private SelectableElement oldSelected = SelectableElement.None;
 
         private XAudio2 audioOut;
         private SoundStream profileClickStream;
@@ -100,11 +95,11 @@ namespace save_switcher.Panels
         private const int usernameLimit = 15;
         private TextLayout defaultUsernameLayout;
 
-        private HashSet<char> bannedUsernameChars = new HashSet<char> 
-            {
-                '\"', '\\', '\0', '\b', '\f', '\n', '\r', '\t', '\v',
-                '=', '+', ';', ':', '*', '%'
-            };
+        private HashSet<char> bannedUsernameChars = new HashSet<char>
+        {
+            '\"', '\\', '\0', '\b', '\f', '\n', '\r', '\t', '\v',
+            '=', '+', ';', ':', '*', '%'
+        };
 
         private (float profilePicture, float acceptButton, float cancelButton, float deleteButton, float usernameTextbox,
             float confirmDeleteYes, float confirmDeleteNo) currentScales;
@@ -113,22 +108,10 @@ namespace save_switcher.Panels
         private bool isEditingUserFlag;
         private int? editingUserID;
 
-        private (bool leftMouseReleased, bool leftMousePressed) mouseState;
-
         private (bool profile, bool username) showEmptyError = (false, false);
 
         private RoundedRectangle usernameTextboxRect;
         private float usernameTextboxWidth = 700f;
-
-        private enum InputChoices
-        {
-            Enter,
-            Cancel,
-            Left,
-            Right,
-            Up,
-            Down,
-        }
 
         private enum SelectableElement
         {
@@ -146,10 +129,6 @@ namespace save_switcher.Panels
         {
             User editUser = args?[0] as User;
             sw = new Stopwatch();
-
-            reconnectControllers();
-
-            mouseState = (false, false);
 
             //set up audio effects
             audioOut = new XAudio2();
@@ -187,6 +166,8 @@ namespace save_switcher.Panels
 
             if (editUser == null)
             {
+                currentSelected = SelectableElement.Profile;
+
                 defaultProfileImage = new BitmapImage("Media/default_user_profile.png", deviceContext, imagingFactory);
 
 
@@ -204,6 +185,7 @@ namespace save_switcher.Panels
             }
             else
             {
+                currentSelected = SelectableElement.Accept;
                 isEditingUserFlag = true;
                 editingUserID = editUser.ID;
 
@@ -239,28 +221,388 @@ namespace save_switcher.Panels
             }
 
             createSizeDependantResources(deviceContext);
+
+            InputManager.OnMousePosChanged += inputMousePosChanged;
+            InputManager.OnLeftMouseInput += inputMouseLeftClick;
+            InputManager.OnLeftInput += inputLeft;
+            InputManager.OnRightInput += inputRight;
+            InputManager.OnUpInput += inputUp;
+            InputManager.OnDownInput += inputDown;
+            InputManager.OnEnterInput += inputEnter;
+            InputManager.OnBackInput += inputBack;
+            InputManager.OnCharacterInput += inputCharacter;
         }
 
-        public void OnMouseDown(System.Windows.Forms.MouseEventArgs e)
+        private void inputBack(InputManager.ButtonTravel travel)
         {
-            if (System.Windows.Forms.Form.ActiveForm == null || OSKeyboard != null)
+            if (OSKeyboard != null)
                 return;
 
-            mouseState.leftMousePressed = true;
+            if (travel == InputManager.ButtonTravel.Down)
+            {
+                if (isShowingConfirmDelete)
+                {
+                    playSelectedSound();
+                    isShowingConfirmDelete = false;
+                }
+                else
+                {
+                    playSelectedSound();
+                    Program.ChangePanel<ProfileSelector>();
+                }
+            }
+
+            updateSelection();
         }
 
-        public void OnMouseUp(System.Windows.Forms.MouseEventArgs e) 
+        private void inputCharacter(InputManager.ButtonTravel travel, char c)
         {
-            if(e.Button != MouseButtons.Left) 
+            if (OSKeyboard != null)
                 return;
 
-            if(mouseState.leftMousePressed)
-                mouseState.leftMouseReleased = true;
+            if (travel != InputManager.ButtonTravel.Up)
+            {
+                typeUsername(c);
+            }
 
-            mouseState.leftMousePressed = false;
+            updateSelection();
         }
 
-        public void OnMouseWheel(System.Windows.Forms.MouseEventArgs e) { }
+        private void inputDown(InputManager.ButtonTravel travel)
+        {
+            if (OSKeyboard != null)
+                return;
+
+            if (travel == InputManager.ButtonTravel.Down)
+            {
+                if (!isShowingConfirmDelete)
+                {
+                    switch (currentSelected)
+                    {
+                        case SelectableElement.Profile:
+                            currentSelected = SelectableElement.Textbox;
+                            break;
+
+                        case SelectableElement.Textbox:
+                            currentSelected = SelectableElement.Accept;
+                            break;
+                    }
+                }
+            }
+
+            updateSelection();
+        }
+
+        private void inputEnter(InputManager.ButtonTravel travel)
+        {
+            if (OSKeyboard != null)
+                return;
+
+            if (travel == InputManager.ButtonTravel.Down)
+            {
+                if (!isShowingConfirmDelete)
+                {
+                    if (currentSelected.Equals(SelectableElement.Accept))
+                    {
+                        playSelectedSound();
+
+                        if (File.Exists(profileFullFileName) && !(string.IsNullOrEmpty(username) || string.IsNullOrWhiteSpace(username)))
+                        {
+                            DatabaseManager dbManager = new DatabaseManager();
+
+                            if (isEditingUserFlag && dbManager.UpdateUser(editingUserID.Value, username))
+                            {
+                                string userDirectory = $@"syncs\user_data\{editingUserID.Value}";
+
+                                if (!Directory.Exists(userDirectory))
+                                    Directory.CreateDirectory(userDirectory);
+
+                                string destination = $@"{userDirectory.TrimEnd('\\')}\profile.png";
+
+                                SharpDX.WIC.ImagingFactory2 wicFactory = new ImagingFactory2();
+                                Stream stream = new FileStream(destination, FileMode.Create, FileAccess.ReadWrite);
+                                BitmapImage image = new BitmapImage(profileFullFileName, deviceContext, wicFactory);
+
+                                BitmapEncoder bitmapEncoder = new BitmapEncoder(wicFactory, ContainerFormatGuids.Png, stream);
+                                BitmapFrameEncode bitmapFrameEncode = new BitmapFrameEncode(bitmapEncoder);
+                                bitmapFrameEncode.Initialize();
+
+                                ImageEncoder imageEncoder = new ImageEncoder(wicFactory, deviceContext.Device);
+                                imageEncoder.WriteFrame(image.Image, bitmapFrameEncode, new ImageParameters(new SharpDX.Direct2D1.PixelFormat(SharpDX.DXGI.Format.R8G8B8A8_UNorm, AlphaMode.Premultiplied), 96f, 96f, 0f, 0f, (int)image.Image.Size.Width, (int)image.Image.Size.Height));
+
+                                bitmapFrameEncode.Commit();
+                                bitmapEncoder.Commit();
+                                stream.Flush();
+                                stream.Close();
+                                //if (Path.GetFullPath(profileFullFileName) != Path.GetFullPath(destination))
+                                //    File.Copy(profileFullFileName, destination, true);
+
+                                Program.ChangePanel<ProfileSelector>();
+                            }
+                            else if (!isEditingUserFlag)
+                            {
+                                if (dbManager.AddUser(username))
+                                {
+                                    User newUser = dbManager.GetUser(username);
+                                    string userDirectory = $@"syncs\user_data\{newUser.ID}";
+
+                                    if (!Directory.Exists(userDirectory))
+                                        Directory.CreateDirectory(userDirectory);
+
+                                    File.Copy(profileFullFileName, $@"{userDirectory.TrimEnd('\\')}\profile.png");
+
+                                    Program.ChangePanel<ProfileSelector>();
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if (!File.Exists(profileFullFileName))
+                                showEmptyError.profile = true;
+
+                            if (string.IsNullOrEmpty(username) || string.IsNullOrWhiteSpace(username))
+                                showEmptyError.username = true;
+                        }
+                    }
+                    else if (currentSelected.Equals(SelectableElement.Cancel))
+                    {
+                        playSelectedSound();
+                        Program.ChangePanel<ProfileSelector>();
+                    }
+                    else if (currentSelected.Equals(SelectableElement.Profile))
+                    {
+                        playSelectedSound();
+                        OpenFileDialog dialog = new OpenFileDialog();
+
+                        dialog.Filter = "Image Files (PNG, JPG & BMP)|*.png;*.jpg;*.jpeg;*.bmp;";
+
+                        if (dialog.ShowDialog() == DialogResult.OK)
+                        {
+                            try
+                            {
+                                profileImage = new BitmapImage(dialog.FileName, deviceContext, imagingFactory);
+
+                                profileBrush.Image = profileImage.Image;
+
+                                profileBrush.SourceRectangle = new RawRectangleF(0f, 0f, profileImage.Image.Size.Width, profileImage.Image.Size.Height);
+                                profileBrush.Transform = Matrix3x2.Scaling(1f, profileImage.Image.Size.Width / profileImage.Image.Size.Height);
+
+                                profileFullFileName = dialog.FileName;
+
+                                float profileBrushRadius = profileImage.Image.Size.Width / 2;
+                                profileImageGeometry = new EllipseGeometry(deviceContext.Factory, new Ellipse(new Vector2(profileBrushRadius, profileBrushRadius), profileBrushRadius, profileBrushRadius));
+
+                                showEmptyError.profile = false;
+                            }
+                            catch (Exception ex)
+                            {
+                                MessageBox.Show(ex.Message);
+                            }
+                        }
+                    }
+                    else if (currentSelected.Equals(SelectableElement.Delete))
+                    {
+                        isShowingConfirmDelete = true;
+                        currentSelected = SelectableElement.ConfirmDeleteNo;
+                        playSelectedSound();
+                    }
+                    else if (currentSelected.Equals(SelectableElement.Textbox))
+                    {
+                        OSKeyboard = new OnScreenKeyboard(deviceContext);
+                        OSKeyboard.Activate();
+
+                        OSKeyboard.OnExit += (object o) =>
+                        {
+                            OSKeyboard = null;
+                        };
+
+                        OSKeyboard.OnUpdate += (char c) =>
+                        {
+                            typeUsername(c);
+                        };
+
+                        OSKeyboard.OnRawKey += (KeyEventArgs args) =>
+                        {
+                            if (args.KeyCode == Keys.Back)
+                                backspaceUsername(args.Control);
+                        };
+                    }
+                }
+                else
+                {
+                    if (currentSelected.Equals(SelectableElement.ConfirmDeleteNo))
+                    {
+                        isShowingConfirmDelete = false;
+                        currentSelected = SelectableElement.Delete;
+                        playSelectedSound();
+                    }
+                    else if (currentSelected.Equals(SelectableElement.ConfirmDeleteYes))
+                    {
+                        DatabaseManager dbManager = new DatabaseManager();
+
+                        if (dbManager.DeleteUser(editingUserID.Value))
+                        {
+                            Program.ChangePanel<ProfileSelector>();
+                        }
+                    }
+                }
+            }
+
+            updateSelection();
+        }
+
+        private void inputLeft(InputManager.ButtonTravel travel)
+        {
+            if (OSKeyboard != null)
+                return;
+
+            if (travel == InputManager.ButtonTravel.Down)
+            {
+                if (!isShowingConfirmDelete)
+                {
+
+                    switch (currentSelected)
+                    {
+                        case SelectableElement.Cancel:
+                            currentSelected = SelectableElement.Accept;
+                            break;
+
+                        case SelectableElement.Delete:
+                            currentSelected = SelectableElement.Profile;
+                            break;
+                    }
+                }
+                else
+                {
+                    if (currentSelected.Equals(SelectableElement.ConfirmDeleteYes))
+                    {
+                        currentSelected = SelectableElement.ConfirmDeleteNo;
+                    }
+                }
+            }
+
+            updateSelection();
+        }
+
+        private void inputMouseLeftClick(InputManager.ButtonTravel travel)
+        {
+            if (travel == InputManager.ButtonTravel.Up)
+            {
+                inputEnter(InputManager.ButtonTravel.Down);
+            }
+
+            updateSelection();
+        }
+
+        private void inputMousePosChanged(System.Drawing.Point p)
+        {
+            Vector2 mousePos = new Vector2(p.X, p.Y);
+
+            if (!isShowingConfirmDelete)
+            {
+                if (Vector2.DistanceSquared(mousePos, new Vector2(deviceContext.Size.Width / 2, deviceContext.Size.Height / 4)) < profilePictureSize / 2 * currentScales.profilePicture * (profilePictureSize / 2 * currentScales.profilePicture))
+                {
+                    currentSelected = SelectableElement.Profile;
+                }
+                else if (mousePos.X > usernameTextboxRect.Rect.Left && mousePos.X < usernameTextboxRect.Rect.Right && mousePos.Y > usernameTextboxRect.Rect.Top && mousePos.Y < usernameTextboxRect.Rect.Bottom)
+                {
+                    currentSelected = SelectableElement.Textbox;
+                }
+                else if (Vector2.DistanceSquared(mousePos, new Vector2(acceptButtonGeometry.Ellipse.Point.X, acceptButtonGeometry.Ellipse.Point.Y)) < changePanelButtonSize / 2 * currentScales.acceptButton * (changePanelButtonSize / 2 * currentScales.acceptButton))
+                {
+                    currentSelected = SelectableElement.Accept;
+                }
+                else if (Vector2.DistanceSquared(mousePos, new Vector2(cancelButtonGeometry.Ellipse.Point.X, cancelButtonGeometry.Ellipse.Point.Y)) < changePanelButtonSize / 2 * currentScales.cancelButton * (changePanelButtonSize / 2 * currentScales.cancelButton))
+                {
+                    currentSelected = SelectableElement.Cancel;
+                }
+            }
+
+            if (isEditingUserFlag)
+            {
+                if (isShowingConfirmDelete)
+                {
+                    if (mousePos.X > confirmDeleteCancelButton.RoundedRect.Rect.Left && mousePos.X < confirmDeleteCancelButton.RoundedRect.Rect.Right && mousePos.Y > confirmDeleteCancelButton.RoundedRect.Rect.Top && mousePos.Y < confirmDeleteCancelButton.RoundedRect.Rect.Bottom)
+                    {
+                        currentSelected = SelectableElement.ConfirmDeleteNo;
+                    }
+                    else if (mousePos.X > confirmDeleteOKButton.RoundedRect.Rect.Left && mousePos.X < confirmDeleteOKButton.RoundedRect.Rect.Right && mousePos.Y > confirmDeleteOKButton.RoundedRect.Rect.Top && mousePos.Y < confirmDeleteOKButton.RoundedRect.Rect.Bottom)
+                    {
+                        currentSelected = SelectableElement.ConfirmDeleteYes;
+                    }
+                }
+                else if (Vector2.DistanceSquared(mousePos, new Vector2(deleteGeometry.Ellipse.Point.X, deleteGeometry.Ellipse.Point.Y)) < deleteButtonSize / 2 * currentScales.deleteButton * (deleteButtonSize / 2 * currentScales.deleteButton))
+                {
+                    currentSelected = SelectableElement.Delete;
+                }
+            }
+
+            updateSelection();
+        }
+
+        private void inputRight(InputManager.ButtonTravel travel)
+        {
+            if (OSKeyboard != null)
+                return;
+
+            if (travel == InputManager.ButtonTravel.Down)
+            {
+                if (!isShowingConfirmDelete)
+                {
+                    switch (currentSelected)
+                    {
+                        case SelectableElement.Accept:
+                            currentSelected = SelectableElement.Cancel;
+                            break;
+
+                        case SelectableElement.Cancel:
+                        case SelectableElement.Textbox:
+                        case SelectableElement.Profile:
+                            if (isEditingUserFlag)
+                                currentSelected = SelectableElement.Delete;
+                            break;
+                    }
+                }
+                else
+                {
+                    if (currentSelected.Equals(SelectableElement.ConfirmDeleteNo))
+                    {
+                        currentSelected = SelectableElement.ConfirmDeleteYes;
+                    }
+                }
+            }
+
+            updateSelection();
+        }
+
+        private void inputUp(InputManager.ButtonTravel travel)
+        {
+            if (OSKeyboard != null)
+                return;
+
+            if (travel == InputManager.ButtonTravel.Down)
+            {
+                if (!isShowingConfirmDelete)
+                {
+                    switch (currentSelected)
+                    {
+                        case SelectableElement.Accept:
+                            currentSelected = SelectableElement.Textbox;
+                            break;
+
+                        case SelectableElement.Cancel:
+                            currentSelected = SelectableElement.Textbox;
+                            break;
+
+                        case SelectableElement.Textbox:
+                            currentSelected = SelectableElement.Profile;
+                            break;
+                    }
+                }
+            }
+
+            updateSelection();
+        }
 
         private void backspaceUsername(bool wordDelete)
         {
@@ -289,7 +631,7 @@ namespace save_switcher.Panels
                 username = "";
 
             int typedKey = c;
-            //key 8 = backspace, tab = 9, 13 = enter, 27 = esacape
+            //key 8 = backspace, 9 = tab, 13 = enter, 27 = esacape
             if (typedKey != 8 && typedKey != 9 && typedKey != 13 && typedKey != 27 &&
                 !bannedUsernameChars.Contains(c))
             {
@@ -301,57 +643,6 @@ namespace save_switcher.Panels
                 usernameLayout.Dispose();
                 usernameLayout = new TextLayout(directWriteFactory, username, usernameTextFormat, 1000f, 100f);
             }
-        }
-
-        public void OnKeyDown(System.Windows.Forms.KeyEventArgs e) 
-        {
-            if (OSKeyboard != null)
-                return;
-
-            if(e.KeyValue == (int)Keys.Back)
-            {
-                backspaceUsername(e.Control);
-            }
-
-            if(e.KeyValue == (int)Keys.Enter)
-            {
-                input(InputChoices.Enter);
-            }
-
-            if(e.KeyValue == (int)Keys.Escape)
-            {
-                input(InputChoices.Cancel);
-            }
-
-            if(e.KeyValue == (int)Keys.Left)
-            {
-                input(InputChoices.Left);
-            }
-
-            if(e.KeyValue == (int)Keys.Right)
-            {
-                input(InputChoices.Right);
-            }
-
-            if(e.KeyValue == (int)Keys.Up)
-            {
-                input(InputChoices.Up);
-            }
-
-            if(e.KeyValue == (int)Keys.Down)
-            {
-                input(InputChoices.Down);
-            }
-        }
-
-        public void OnKeyUp(System.Windows.Forms.KeyEventArgs e) { }
-
-        public void OnKeyPress(System.Windows.Forms.KeyPressEventArgs e)
-        {
-            if (OSKeyboard != null)
-                return;
-
-            typeUsername(e.KeyChar);
         }
 
         private void createSizeDependantResources(DeviceContext deviceContext)
@@ -528,273 +819,6 @@ namespace save_switcher.Panels
             }
         }
 
-        private void input(InputChoices inputChoice, bool mouseInput = false)
-        {
-            if (!mouseInput && currentSelected.Equals(SelectableElement.None) && inputChoice != InputChoices.Cancel && !isShowingConfirmDelete)
-            {
-                currentSelected = SelectableElement.Accept;
-                playSelectedSound();
-                return;
-            }
-
-            SelectableElement oldSelected = currentSelected;
-
-            switch(inputChoice)
-            {
-                case InputChoices.Enter:
-                    if (!isShowingConfirmDelete)
-                    {
-                        if (currentSelected.Equals(SelectableElement.Accept))
-                        {
-                            playSelectedSound();
-
-                            if (File.Exists(profileFullFileName) && !(string.IsNullOrEmpty(username) || string.IsNullOrWhiteSpace(username)))
-                            {
-                                DatabaseManager dbManager = new DatabaseManager();
-
-                                if (isEditingUserFlag && dbManager.UpdateUser(editingUserID.Value, username))
-                                {
-                                    string userDirectory = $@"syncs\user_data\{editingUserID.Value}";
-
-                                    if (!Directory.Exists(userDirectory))
-                                        Directory.CreateDirectory(userDirectory);
-
-                                    string destination = $@"{userDirectory.TrimEnd('\\')}\profile.png";
-
-                                    SharpDX.WIC.ImagingFactory2 wicFactory = new ImagingFactory2();
-                                    Stream stream = new FileStream(destination, FileMode.Create, FileAccess.ReadWrite);
-                                    BitmapImage image = new BitmapImage(profileFullFileName, deviceContext, wicFactory);
-
-                                    BitmapEncoder bitmapEncoder = new BitmapEncoder(wicFactory, ContainerFormatGuids.Png, stream);
-                                    BitmapFrameEncode bitmapFrameEncode = new BitmapFrameEncode(bitmapEncoder);
-                                    bitmapFrameEncode.Initialize();
-
-                                    ImageEncoder imageEncoder = new ImageEncoder(wicFactory, deviceContext.Device);
-                                    imageEncoder.WriteFrame(image.Image, bitmapFrameEncode, new ImageParameters(new SharpDX.Direct2D1.PixelFormat(SharpDX.DXGI.Format.R8G8B8A8_UNorm, AlphaMode.Premultiplied), 96f, 96f, 0f, 0f, (int)image.Image.Size.Width, (int)image.Image.Size.Height));
-
-                                    bitmapFrameEncode.Commit();
-                                    bitmapEncoder.Commit();
-                                    stream.Flush();
-                                    stream.Close();
-                                    //if (Path.GetFullPath(profileFullFileName) != Path.GetFullPath(destination))
-                                    //    File.Copy(profileFullFileName, destination, true);
-
-                                    Program.ChangePanel<ProfileSelector>();
-                                }
-                                else if (!isEditingUserFlag)
-                                {
-                                    if (dbManager.AddUser(username))
-                                    {
-                                        User newUser = dbManager.GetUser(username);
-                                        string userDirectory = $@"syncs\user_data\{newUser.ID}";
-
-                                        if (!Directory.Exists(userDirectory))
-                                            Directory.CreateDirectory(userDirectory);
-
-                                        File.Copy(profileFullFileName, $@"{userDirectory.TrimEnd('\\')}\profile.png");
-
-                                        Program.ChangePanel<ProfileSelector>();
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                if (!File.Exists(profileFullFileName))
-                                    showEmptyError.profile = true;
-
-                                if (string.IsNullOrEmpty(username) || string.IsNullOrWhiteSpace(username))
-                                    showEmptyError.username = true;
-                            }
-                        }
-                        else if (currentSelected.Equals(SelectableElement.Cancel))
-                        {
-                            playSelectedSound();
-                            Program.ChangePanel<ProfileSelector>();
-                        }
-                        else if (currentSelected.Equals(SelectableElement.Profile))
-                        {
-                            playSelectedSound();
-                            OpenFileDialog dialog = new OpenFileDialog();
-
-                            dialog.Filter = "Image Files (PNG, JPG & BMP)|*.png;*.jpg;*.jpeg;*.bmp;";
-
-                            if (dialog.ShowDialog() == DialogResult.OK)
-                            {
-                                try
-                                {
-                                    profileImage = new BitmapImage(dialog.FileName, deviceContext, imagingFactory);
-
-                                    profileBrush.Image = profileImage.Image;
-
-                                    profileBrush.SourceRectangle = new RawRectangleF(0f, 0f, profileImage.Image.Size.Width, profileImage.Image.Size.Height);
-                                    profileBrush.Transform = Matrix3x2.Scaling(1f, profileImage.Image.Size.Width / profileImage.Image.Size.Height);
-
-                                    profileFullFileName = dialog.FileName;
-
-                                    float profileBrushRadius = profileImage.Image.Size.Width / 2;
-                                    profileImageGeometry = new EllipseGeometry(deviceContext.Factory, new Ellipse(new Vector2(profileBrushRadius, profileBrushRadius), profileBrushRadius, profileBrushRadius));
-
-                                    showEmptyError.profile = false;
-                                }
-                                catch (Exception ex)
-                                {
-                                    MessageBox.Show(ex.Message);
-                                }
-                            }
-                        }
-                        else if (currentSelected.Equals(SelectableElement.Delete))
-                        {
-                            isShowingConfirmDelete = true;
-                            currentSelected = SelectableElement.ConfirmDeleteNo;
-                            playSelectedSound();
-                        }
-                        else if (currentSelected.Equals(SelectableElement.Textbox) && !mouseInput)
-                        {
-                            OSKeyboard = new OnScreenKeyboard(deviceContext);
-                            OSKeyboard.Activate();
-
-                            OSKeyboard.OnExit += (object o) =>
-                            {
-                                OSKeyboard = null;
-                            };
-
-                            OSKeyboard.OnUpdate += (char c) =>
-                            {
-                                typeUsername(c);
-                            };
-
-                            OSKeyboard.OnRawKey += (KeyEventArgs args) =>
-                            {
-                                if (args.KeyCode == Keys.Back)
-                                    backspaceUsername(args.Control);
-                            };
-                        }
-                    }
-                    else
-                    {
-                        if (currentSelected.Equals(SelectableElement.ConfirmDeleteNo))
-                        {
-                            isShowingConfirmDelete = false;
-                            currentSelected = SelectableElement.Delete;
-                            playSelectedSound();
-                        }
-                        else if (currentSelected.Equals(SelectableElement.ConfirmDeleteYes))
-                        {
-                            DatabaseManager dbManager = new DatabaseManager();
-
-                            if (dbManager.DeleteUser(editingUserID.Value))
-                            {
-                                Program.ChangePanel<ProfileSelector>();
-                            }
-                        }
-                    }
-
-                    break;
-                case InputChoices.Cancel:
-                    if (isShowingConfirmDelete)
-                    {
-                        playSelectedSound();
-                        isShowingConfirmDelete = false;
-                    }
-                    else
-                    {
-                        playSelectedSound();
-                        Program.ChangePanel<ProfileSelector>();
-                    }
-                    break;
-
-                case InputChoices.Up:
-                    if (!isShowingConfirmDelete)
-                    {
-                        switch (currentSelected)
-                        {
-                            case SelectableElement.Accept:
-                                currentSelected = SelectableElement.Textbox;
-                                break;
-
-                            case SelectableElement.Cancel:
-                                currentSelected = SelectableElement.Textbox;
-                                break;
-
-                            case SelectableElement.Textbox:
-                                currentSelected = SelectableElement.Profile;
-                                break;
-                        }
-                    }
-                    break;
-
-                case InputChoices.Down:
-                    if (!isShowingConfirmDelete)
-                    {
-                        switch(currentSelected)
-                        {
-                            case SelectableElement.Profile:
-                                currentSelected = SelectableElement.Textbox;
-                                break;
-
-                            case SelectableElement.Textbox:
-                                currentSelected = SelectableElement.Accept;
-                                break;
-                        }
-                    }
-                    break;
-
-                case InputChoices.Right:
-                    if (!isShowingConfirmDelete)
-                    {
-                        switch(currentSelected)
-                        {
-                            case SelectableElement.Accept:
-                                currentSelected = SelectableElement.Cancel;
-                                break;
-
-                            case SelectableElement.Cancel:
-                            case SelectableElement.Textbox:
-                            case SelectableElement.Profile:
-                                if (isEditingUserFlag)
-                                    currentSelected = SelectableElement.Delete;
-                                break;
-                        }
-                    }
-                    else
-                    {
-                        if(currentSelected.Equals(SelectableElement.ConfirmDeleteNo))
-                        {
-                            currentSelected = SelectableElement.ConfirmDeleteYes;
-                        }
-                    }
-                    break;
-
-                case InputChoices.Left:
-                    if (!isShowingConfirmDelete)
-                    {
-
-                        switch (currentSelected)
-                        {
-                            case SelectableElement.Cancel:
-                                currentSelected = SelectableElement.Accept;
-                                break;
-
-                            case SelectableElement.Delete:
-                                currentSelected = SelectableElement.Profile;
-                                break;
-                        }
-                    }
-                    else
-                    {
-                        if (currentSelected.Equals(SelectableElement.ConfirmDeleteYes))
-                        {
-                            currentSelected = SelectableElement.ConfirmDeleteNo;
-                        }
-                    }
-                    
-                    break;
-            }
-
-            if (oldSelected != currentSelected)
-                playSelectedSound();
-        }
-
         private void playSelectedSound()
         {
             selectionClickVoice = new SourceVoice(audioOut, profileClickStream.Format, false);
@@ -803,30 +827,13 @@ namespace save_switcher.Panels
             selectionClickVoice.Start();
         }
 
-        private void reconnectControllers()
+        private void updateSelection()
         {
-            List<Controller> connectedControllers = new List<Controller>();
-            List<State> connectedControllersState = new List<State>();
-
-            //for each controller that is connected, save it into the list
-            for (int i = 0; i < 4; i++)
+            if(currentSelected != oldSelected)
             {
-                Controller testController = new Controller((UserIndex)i - 1);
-
-
-                if (testController.IsConnected)
-                {
-                    connectedControllers.Add(testController);
-                    connectedControllersState.Add(testController.GetState());
-                }
+                playSelectedSound();
+                oldSelected = currentSelected;
             }
-
-            //use those lists to populate these arrays
-            controllers = connectedControllers.ToArray();
-            oldControllerState = connectedControllersState.ToArray();
-
-            lastControllerReconnectTime = sw.ElapsedMilliseconds;
-
         }
 
         private float lerp(float start, float end, float amount)
@@ -862,140 +869,6 @@ namespace save_switcher.Panels
                 OSKeyboard.Update();
                 return;
             }
-
-            System.Drawing.Point currentMousePos = System.Windows.Forms.Cursor.Position;
-            System.Drawing.Point mouseToScreen = activeForm.PointToClient(currentMousePos);
-            Vector2 mousePos = new Vector2(mouseToScreen.X, mouseToScreen.Y);
-
-            if (oldMousePos == null)
-                oldMousePos = mousePos;
-
-            if (mousePos != oldMousePos || mouseState.leftMouseReleased)
-            {
-                SelectableElement oldSelected = currentSelected;
-
-                if (!isShowingConfirmDelete)
-                {
-                    if (Vector2.DistanceSquared(mousePos, new Vector2(deviceContext.Size.Width / 2, deviceContext.Size.Height / 4)) < profilePictureSize / 2 * currentScales.profilePicture * (profilePictureSize / 2 * currentScales.profilePicture))
-                    {
-                        currentSelected = SelectableElement.Profile;
-
-                        if(mouseState.leftMouseReleased)
-                            input(InputChoices.Enter, true);
-                    }
-                    else if (mousePos.X > usernameTextboxRect.Rect.Left && mousePos.X < usernameTextboxRect.Rect.Right && mousePos.Y > usernameTextboxRect.Rect.Top && mousePos.Y < usernameTextboxRect.Rect.Bottom)
-                    {
-                        currentSelected = SelectableElement.Textbox;
-
-                        if (mouseState.leftMouseReleased)
-                            input(InputChoices.Enter, true);
-                    }
-                    else if (Vector2.DistanceSquared(mousePos, new Vector2(acceptButtonGeometry.Ellipse.Point.X, acceptButtonGeometry.Ellipse.Point.Y)) < changePanelButtonSize / 2 * currentScales.acceptButton * (changePanelButtonSize / 2 * currentScales.acceptButton))
-                    {
-                        currentSelected = SelectableElement.Accept;
-
-                        if (mouseState.leftMouseReleased)
-                            input(InputChoices.Enter, true);
-                    }
-                    else if (Vector2.DistanceSquared(mousePos, new Vector2(cancelButtonGeometry.Ellipse.Point.X, cancelButtonGeometry.Ellipse.Point.Y)) < changePanelButtonSize / 2 * currentScales.cancelButton * (changePanelButtonSize / 2 * currentScales.cancelButton))
-                    {
-                        currentSelected = SelectableElement.Cancel;
-
-                        if (mouseState.leftMouseReleased)
-                            input(InputChoices.Enter, true);
-                    }
-                }
-
-                if (isEditingUserFlag)
-                {
-                    if (isShowingConfirmDelete)
-                    {
-                        if (mousePos.X > confirmDeleteCancelButton.RoundedRect.Rect.Left && mousePos.X < confirmDeleteCancelButton.RoundedRect.Rect.Right && mousePos.Y > confirmDeleteCancelButton.RoundedRect.Rect.Top && mousePos.Y < confirmDeleteCancelButton.RoundedRect.Rect.Bottom)
-                        {
-                            currentSelected = SelectableElement.ConfirmDeleteNo;
-
-                            if (mouseState.leftMouseReleased)
-                                input(InputChoices.Enter, true);
-                        }
-                        else if (mousePos.X > confirmDeleteOKButton.RoundedRect.Rect.Left && mousePos.X < confirmDeleteOKButton.RoundedRect.Rect.Right && mousePos.Y > confirmDeleteOKButton.RoundedRect.Rect.Top && mousePos.Y < confirmDeleteOKButton.RoundedRect.Rect.Bottom)
-                        {
-                            currentSelected = SelectableElement.ConfirmDeleteYes;
-
-                            if (mouseState.leftMouseReleased)
-                                input(InputChoices.Enter, true);
-                        }
-                    }
-                    else if (Vector2.DistanceSquared(mousePos, new Vector2(deleteGeometry.Ellipse.Point.X, deleteGeometry.Ellipse.Point.Y)) < deleteButtonSize / 2 * currentScales.deleteButton * (deleteButtonSize / 2 * currentScales.deleteButton))
-                    {
-                        currentSelected = SelectableElement.Delete;
-
-                        if (mouseState.leftMouseReleased)
-                            input(InputChoices.Enter, true);
-                    }
-                }
-
-                if (currentSelected != oldSelected)
-                    playSelectedSound();
-
-                oldMousePos = mousePos;
-                mouseState.leftMouseReleased = false;
-            }
-
-            //controller input
-
-            //controller input
-            if (lastControllerReconnectTime + 5000 < sw.ElapsedMilliseconds)
-                reconnectControllers();
-
-            for (int controller = 0; controller < controllers.Length; controller++)
-            {
-                //don't do anything if the controller isn't connected
-                if (controllers[controller].IsConnected)
-                {
-                    //get the current state and the old state for comparison
-                    State currentControllerState = controllers[controller].GetState();
-                    State compareState = oldControllerState[controller];
-
-                    //if the left stick is past the dead zone this time and short the dead zone last time OR the d-pad is pressed
-                    if (((float)currentControllerState.Gamepad.LeftThumbX / short.MaxValue > deadZone && ((float)compareState.Gamepad.LeftThumbX / short.MaxValue) < deadZone) ||
-                            (currentControllerState.Gamepad.Buttons & GamepadButtonFlags.DPadRight) == GamepadButtonFlags.DPadRight && (compareState.Gamepad.Buttons & GamepadButtonFlags.DPadRight) == 0)
-                    {
-                        input(InputChoices.Right);
-                    }
-                    //same for this one except for left
-                    else if (((float)currentControllerState.Gamepad.LeftThumbX / short.MaxValue * -1f > deadZone && (float)compareState.Gamepad.LeftThumbX / short.MaxValue * -1f < deadZone) ||
-                        (currentControllerState.Gamepad.Buttons & GamepadButtonFlags.DPadLeft) == GamepadButtonFlags.DPadLeft && (compareState.Gamepad.Buttons & GamepadButtonFlags.DPadLeft) == 0)
-                    {
-                        input(InputChoices.Left);
-                    }
-                    //and for down
-                    else if (((float)currentControllerState.Gamepad.LeftThumbY / short.MaxValue * -1f > deadZone && (float)compareState.Gamepad.LeftThumbY / short.MaxValue * -1f < deadZone) ||
-                        (currentControllerState.Gamepad.Buttons & GamepadButtonFlags.DPadDown) == GamepadButtonFlags.DPadDown && (compareState.Gamepad.Buttons & GamepadButtonFlags.DPadDown) == 0)
-                    {
-                        input(InputChoices.Down);
-                    }
-                    //and for up
-                    else if (((float)currentControllerState.Gamepad.LeftThumbY / short.MaxValue > deadZone && (float)compareState.Gamepad.LeftThumbY / short.MaxValue < deadZone) ||
-                        (currentControllerState.Gamepad.Buttons & GamepadButtonFlags.DPadUp) == GamepadButtonFlags.DPadUp && (compareState.Gamepad.Buttons & GamepadButtonFlags.DPadUp) == 0)
-                    {
-                        input(InputChoices.Up);
-                    }
-                    //see if the 'A' or 'X' button was pressed this frame
-                    else if (((currentControllerState.Gamepad.Buttons & GamepadButtonFlags.A) == GamepadButtonFlags.A || (currentControllerState.Gamepad.Buttons & GamepadButtonFlags.X) == GamepadButtonFlags.X) &&
-                        (compareState.Gamepad.Buttons & (GamepadButtonFlags.X | GamepadButtonFlags.A)) == 0)
-                    {
-                        input(InputChoices.Enter);
-                    }
-                    //see if the 'B' button was pressed this frame
-                    else if ((currentControllerState.Gamepad.Buttons & GamepadButtonFlags.B) == GamepadButtonFlags.B && (compareState.Gamepad.Buttons & GamepadButtonFlags.B) == 0)
-                    {
-                        input(InputChoices.Cancel);
-                    }
-
-                    oldControllerState[controller] = currentControllerState;
-                }
-            }
-
         }
 
         public override void Draw(DeviceContext deviceContext)
@@ -1238,7 +1111,7 @@ namespace save_switcher.Panels
                 OSKeyboard.Draw();
         }
 
-        ~AddUser()
+        public void Dispose()
         {
             audioOut.Dispose();
             profileClickStream.Dispose();
@@ -1278,10 +1151,11 @@ namespace save_switcher.Panels
 
             usernameLayout.Dispose();
 
-
             confirmDeleteText?.Dispose();
             confirmDeleteOKText?.Dispose();
             confirmDeleteCancelText?.Dispose();
+
+            InputManager.RemoveEventsFromObject(this);
         }
     }
 }
