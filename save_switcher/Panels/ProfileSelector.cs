@@ -7,6 +7,7 @@ using SharpDX.Multimedia;
 using SharpDX.WIC;
 using SharpDX.XAudio2;
 using SharpDX.XInput;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -15,7 +16,7 @@ using System.Windows.Input;
 
 namespace save_switcher.Panels
 {
-    class ProfileSelector : Panel, IMouseable
+    class ProfileSelector : Panel, IDisposable
     {
         private readonly float baseProfilePictureSize = 300;
         private readonly float baseProfilePadding = 100;
@@ -43,13 +44,13 @@ namespace save_switcher.Panels
         private BitmapImage inputImageSpacebar;
         private BitmapImage inputImageMouseRightClick;
         private TextLayout editProfileInputTextLayout;
-        private InputType currentInputType = InputType.Mouse;
 
         private float profilePictureSize;
         private float profilePadding;
         private float edgeMouseSelectionThickness;
         private readonly float selectedScale = 1.3f;
         private int selectedUserIndex;
+        private (int selectedUserIndex, int selectedUtilityIndex, InputLayers currentLayer) oldPanelstate = (0, 0, InputLayers.Users);
 
         private DeviceContext deviceContext;
 
@@ -75,29 +76,9 @@ namespace save_switcher.Panels
 
         private DatabaseManager databaseManager;
 
-        private Controller[] controllers;
-        private readonly float deadZone = 0.8f;
-        private State[] oldControllerState;
-        private System.Drawing.Point oldMousePos;
-        private bool mouseLeftButtonReleased;
-        private bool mouseRightButtonReleased;
-        private KeyState[] oldKeyState;
-        private Key[] monitorKeys = new Key[]
-        {
-            Key.Left,
-            Key.Right,
-            Key.Up,
-            Key.Down,
-            Key.Enter,
-            Key.Space,
-            Key.Escape,
-        };
-
         private Stopwatch sw;
 
         private float lastMilliseconds;
-        private long lastMouseUserSelectedTime;
-        private long lastControllerReconnectTime;
         private float lastStartX;
         private float targetStartX;
 
@@ -120,217 +101,43 @@ namespace save_switcher.Panels
             EditProfile,
         }
 
-        private struct KeyState
+        public void Dispose()
         {
-            public Key key;
-            public bool isPressed;
-        }
-        
-        private enum Inputs
-        {
-            None,
-            Left,
-            Right,
-            Up,
-            Down,
-            Enter,
-            AltEnter,
-            Back,
-        }
+            utilityButtonImages.addUserImage.Image.Dispose();
+            utilityButtonImages.settingsImage.Image.Dispose();
 
-        private enum InputType
-        {
-            Mouse,
-            Keyboard,
-            Controller,
-        }
-
-        public override void Initialize(DeviceContext deviceContext, params object[] args) {
-
-            this.deviceContext = deviceContext;
-
-            sw = new Stopwatch();
-
-            //set up inputs
-            reconnectControllers();
-
-            //populate oldKeyState
-            oldKeyState = new KeyState[monitorKeys.Length];
-            for(int i = 0; i < monitorKeys.Length; i++)
+            for (int i = 0; i < users.Length; i++)
             {
-                oldKeyState[i] = new KeyState
-                {
-                    key = monitorKeys[i],
-                    isPressed = true
-                };
+                users[i].ProfileGeometry.Dispose();
+                users[i].ProfileBrush.Dispose();
+                users[i].ProfileImage.Image.Dispose();
+                users[i].Layout.Dispose();
             }
 
-            //set up audio effects
-            audioOut = new XAudio2();
-            MasteringVoice voice = new MasteringVoice(audioOut);
+            whosPlayingLayout.Dispose();
 
-            profileClickStream = new SoundStream(File.OpenRead("Media/profile_selection_2.wav"));
+            editProfileInputTextLayout.Dispose();
 
-            selectionClickBuffer = new AudioBuffer
-            {
-                Stream = profileClickStream.ToDataStream(),
-                AudioBytes = (int)profileClickStream.Length,
-            };
-            profileClickStream.Close();
+            colorBrush.Dispose();
+            backgroundGradientBrush.Dispose();
 
+            if (selectionClickVoice != null)
+                selectionClickVoice.Dispose();
 
-            ImagingFactory imagingFactory = new ImagingFactory();
-            databaseManager = new DatabaseManager();
+            audioOut.Dispose();
+            profileClickStream.Dispose();
 
-            //create users
-            User[] dbUsers = Program.GameID == null ? databaseManager.GetAllUsers() : databaseManager.GetAllUsers(Program.GameID.Value);
-            users = dbUsers != null ? new ProfileUser[dbUsers.Length] : new ProfileUser[0];
+            utilityButtonImages.addUserImage.Image.Dispose();
+            utilityButtonImages.settingsImage.Image.Dispose();
+            editProfileBitmap.Image.Dispose();
+            addUserStrokeStyle.Dispose();
+            inputImageMouseRightClick.Image.Dispose();
+            inputImageSpacebar.Image.Dispose();
+            inputImageXboxYButton.Image.Dispose();
 
-            for(int i = 0; i < users.Length; i++)
-            {
-                string profilePicture = "";
+            sw.Stop();
 
-                string userProfilePicture = $@"syncs\user_data\{dbUsers[i].ID}\profile.png";
-                if (!File.Exists(userProfilePicture))
-                    profilePicture = "Media/default_user_profile.png";
-                else
-                    profilePicture = userProfilePicture;
-                
-                BitmapImage image = new BitmapImage(Path.GetFullPath(profilePicture), deviceContext, imagingFactory);
-
-                float imageRadius = image.Image.Size.Width / 2;
-                //users[i] = new ProfileUser(image, dbUsers[i], layout, new EllipseGeometry(deviceContext.Factory, new Ellipse(new RawVector2(imageRadius, imageRadius), imageRadius, imageRadius)), deviceContext);
-
-                users[i] = new ProfileUser
-                {
-                    User = dbUsers[i],
-                    ProfileImage = image,
-                    ProfileBrush = new ImageBrush(deviceContext, image.Image, new ImageBrushProperties { ExtendModeX = ExtendMode.Clamp, ExtendModeY = ExtendMode.Clamp, InterpolationMode = SharpDX.Direct2D1.InterpolationMode.Linear, SourceRectangle = new RawRectangleF(0f, 0f, image.Image.Size.Width, image.Image.Size.Height) }),
-                    CurrentSelectedScale = 1f,
-                    ProfileGeometry = new EllipseGeometry(deviceContext.Factory, new Ellipse(new RawVector2(imageRadius, imageRadius), imageRadius, imageRadius)),
-                    ScreenPosition = Vector2.Zero,
-                    //NOTE: Layout is set when we call createSizeDependantResources()
-                };
-                users[i].ProfileBrush.Transform = Matrix3x2.Scaling(1f, users[i].ProfileImage.Image.Size.Width / users[i].ProfileImage.Image.Size.Height);
-            }
-
-            //set up utility buttons
-            utilityButtonScales.addUserScale = 1f;
-            utilityButtonScales.settingsScale = 1f;
-
-            utilityButtonImages.addUserImage = new BitmapImage("Media/add_user.png", deviceContext, imagingFactory);
-            utilityButtonImages.settingsImage = new BitmapImage("Media/settings.png", deviceContext, imagingFactory);
-
-            editProfileBitmap = new BitmapImage("Media/edit.png", deviceContext, imagingFactory);
-
-            StrokeStyleProperties strokeProperties = new StrokeStyleProperties()
-            {
-                StartCap = CapStyle.Round,
-                EndCap = CapStyle.Round,
-                LineJoin = LineJoin.Round,
-                DashStyle = DashStyle.Solid,
-            };
-
-            addUserStrokeStyle = new StrokeStyle(deviceContext.Factory, strokeProperties);
-
-            //set up input images
-            inputImageMouseRightClick = new BitmapImage("Media/mouse_right_click.png", deviceContext, imagingFactory);
-            inputImageSpacebar = new BitmapImage("Media/spacebar.png", deviceContext, imagingFactory);
-            inputImageXboxYButton = new BitmapImage("Media/xbox_y_button.png", deviceContext, imagingFactory);
-
-            createSizeDependantResources(deviceContext);
-            targetStartX = profilePadding;
-
-            //start the stopwatch
-            sw.Start();
-
-
-            //setup inputs
-            InputManager.OnMousePosChanged += mousePosChanged;
-            
-        }
-
-        private void mousePosChanged(System.Drawing.Point p)
-        {
-            currentInputType = InputType.Mouse;
-
-            Vector2 mousePos = new Vector2(p.X, p.Y);
-
-            //using distance squared throughout this for better performance
-            //check for cursor over the 'add user' button
-            if (Vector2.DistanceSquared(utilityButtonPositions.addUserPosition, mousePos) < (utilityButtonSize / 2 * utilityButtonScales.addUserScale) * (utilityButtonSize / 2 * utilityButtonScales.addUserScale))
-            {
-                //set the current input layer
-                currentInputLayer = InputLayers.Utilities;
-
-                //set the current index
-                selectedUtilityIndex = 0;
-            }
-            //check for cursor over the 'settings' button
-            else if (Vector2.DistanceSquared(utilityButtonPositions.settingsPosition, mousePos) < (utilityButtonSize / 2 * utilityButtonScales.settingsScale) * (utilityButtonSize / 2 * utilityButtonScales.settingsScale))
-            {
-                //set the current input layer
-                currentInputLayer = InputLayers.Utilities;
-
-                //set the current index
-                selectedUtilityIndex = 1;
-            }
-            else if (users.Length == 0 && Vector2.DistanceSquared(new Vector2(deviceContext.Size.Width / 2, deviceContext.Size.Height / 2), mousePos) < profilePictureSize * currentAddUserScale / 2 * (profilePictureSize * currentAddUserScale / 2))
-            {
-                currentInputLayer = InputLayers.Users;
-                selectedUserIndex = 0;
-            }
-            //check for cursor over the user profile buttons
-            else
-            {
-                Debug.WriteLine("udpdating" + sw.ElapsedMilliseconds);
-                for (int i = 0; i < users.Length; i++)
-                {
-                    //get the center of the profile in screen coordinates
-                    Vector2 profileCenter = new Vector2(users[i].ScreenPosition.X + (profilePictureSize * users[i].CurrentSelectedScale / 2), users[i].ScreenPosition.Y + (profilePictureSize * users[i].CurrentSelectedScale / 2));
-
-                    if (Vector2.DistanceSquared(profileCenter, mousePos) < (profilePictureSize / 2 * users[i].CurrentSelectedScale) * (profilePictureSize / 2 * users[i].CurrentSelectedScale))
-                    {
-
-                        //set the current profile index
-                        selectedUserIndex = i;
-
-                        lastMouseUserSelectedTime = sw.ElapsedMilliseconds;
-
-
-                        if (currentInputLayer != InputLayers.Users && currentInputLayer != InputLayers.EditProfile)
-                            //sets the current input layer
-                            currentInputLayer = InputLayers.Users;
-
-                        if (currentInputLayer == InputLayers.EditProfile)
-                        {
-                            isCursorOverEditButton = Vector2.DistanceSquared(profileCenter, mousePos) < (editProfileSize * users[i].CurrentSelectedScale / 2) * (editProfileSize * users[i].CurrentSelectedScale / 2);
-
-                            currentInputLayer = InputLayers.Users;
-                        }
-                    }
-                }
-            }
-
-        }
-
-        public void OnMouseDown(System.Windows.Forms.MouseEventArgs e) { }
-
-        public void OnMouseUp(System.Windows.Forms.MouseEventArgs e)
-        {
-            //for use in Update()
-            if (e.Button == System.Windows.Forms.MouseButtons.Left)
-                mouseLeftButtonReleased = true;
-            else if (e.Button == System.Windows.Forms.MouseButtons.Right)
-                mouseRightButtonReleased = true;
-        }
-
-        public void OnMouseWheel(System.Windows.Forms.MouseEventArgs e)
-        {
-            if (e.Delta > 0)
-                selectedUserIndex = clamp(selectedUserIndex + 1, 0, users.Length - 1);
-            else if (e.Delta < 0)
-                selectedUserIndex = clamp(selectedUserIndex - 1, 0, users.Length - 1);
+            InputManager.RemoveEventsFromObject(this);
         }
 
         public override void Draw(DeviceContext deviceContext)
@@ -514,19 +321,19 @@ namespace save_switcher.Panels
 
                 deviceContext.Transform = Matrix3x2.Scaling(deviceScale, deviceScale, new Vector2(0f, deviceContext.Size.Height));
 
-                switch (currentInputType)
+                switch (InputManager.CurrentInputType)
                 {
-                    case InputType.Mouse:
+                    case InputManager.InputType.Mouse:
                         deviceContext.DrawBitmap(inputImageMouseRightClick.Image, new RawRectangleF(20f, deviceContext.Size.Height - 100f, 100f, deviceContext.Size.Height - 20f), 1f, SharpDX.Direct2D1.BitmapInterpolationMode.Linear);
                         deviceContext.DrawTextLayout(new Vector2(100f, deviceContext.Size.Height - editProfileInputTextLayout.MaxHeight - 50f), editProfileInputTextLayout, colorBrush);
                         break;
 
-                    case InputType.Keyboard:
+                    case InputManager.InputType.Keyboard:
                         deviceContext.DrawBitmap(inputImageSpacebar.Image, new RawRectangleF(20f, deviceContext.Size.Height - 70f, 140f, deviceContext.Size.Height - 20f), 1f, SharpDX.Direct2D1.BitmapInterpolationMode.Linear);
                         deviceContext.DrawTextLayout(new Vector2(160f, deviceContext.Size.Height - editProfileInputTextLayout.MaxHeight - 35f), editProfileInputTextLayout, colorBrush);
                         break;
 
-                    case InputType.Controller:
+                    case InputManager.InputType.Controller:
                         deviceContext.DrawBitmap(inputImageXboxYButton.Image, new RawRectangleF(20f, deviceContext.Size.Height - 90f, 90f, deviceContext.Size.Height - 20f), 1f, SharpDX.Direct2D1.BitmapInterpolationMode.Linear);
                         deviceContext.DrawTextLayout(new Vector2(100f, deviceContext.Size.Height - editProfileInputTextLayout.MaxHeight - 40f), editProfileInputTextLayout, colorBrush);
                         break;
@@ -537,356 +344,126 @@ namespace save_switcher.Panels
             deviceContext.EndDraw();
         }
 
-        public override void Resize(DeviceContext deviceContext)
-        {
+        public override void Initialize(DeviceContext deviceContext, params object[] args) {
+
             this.deviceContext = deviceContext;
 
-            colorBrush.Dispose();
-            backgroundGradientBrush.Dispose();
+            sw = new Stopwatch();
+
+            //set up audio effects
+            audioOut = new XAudio2();
+            MasteringVoice voice = new MasteringVoice(audioOut);
+
+            profileClickStream = new SoundStream(File.OpenRead("Media/profile_selection_2.wav"));
+
+            selectionClickBuffer = new AudioBuffer
+            {
+                Stream = profileClickStream.ToDataStream(),
+                AudioBytes = (int)profileClickStream.Length,
+            };
+            profileClickStream.Close();
+
+
+            ImagingFactory imagingFactory = new ImagingFactory();
+            databaseManager = new DatabaseManager();
+
+            //create users
+            User[] dbUsers = Program.GameID == null ? databaseManager.GetAllUsers() : databaseManager.GetAllUsers(Program.GameID.Value);
+            users = dbUsers != null ? new ProfileUser[dbUsers.Length] : new ProfileUser[0];
 
             for(int i = 0; i < users.Length; i++)
             {
-                users[i].Layout.Dispose();
+                string profilePicture = "";
+
+                string userProfilePicture = $@"syncs\user_data\{dbUsers[i].ID}\profile.png";
+                if (!File.Exists(userProfilePicture))
+                    profilePicture = "Media/default_user_profile.png";
+                else
+                    profilePicture = userProfilePicture;
+                
+                BitmapImage image = new BitmapImage(Path.GetFullPath(profilePicture), deviceContext, imagingFactory);
+
+                float imageRadius = image.Image.Size.Width / 2;
+                //users[i] = new ProfileUser(image, dbUsers[i], layout, new EllipseGeometry(deviceContext.Factory, new Ellipse(new RawVector2(imageRadius, imageRadius), imageRadius, imageRadius)), deviceContext);
+
+                users[i] = new ProfileUser
+                {
+                    User = dbUsers[i],
+                    ProfileImage = image,
+                    ProfileBrush = new ImageBrush(deviceContext, image.Image, new ImageBrushProperties { ExtendModeX = ExtendMode.Clamp, ExtendModeY = ExtendMode.Clamp, InterpolationMode = SharpDX.Direct2D1.InterpolationMode.Linear, SourceRectangle = new RawRectangleF(0f, 0f, image.Image.Size.Width, image.Image.Size.Height) }),
+                    CurrentSelectedScale = 1f,
+                    ProfileGeometry = new EllipseGeometry(deviceContext.Factory, new Ellipse(new RawVector2(imageRadius, imageRadius), imageRadius, imageRadius)),
+                    ScreenPosition = Vector2.Zero,
+                    //NOTE: Layout is set when we call createSizeDependantResources()
+                };
+                users[i].ProfileBrush.Transform = Matrix3x2.Scaling(1f, users[i].ProfileImage.Image.Size.Width / users[i].ProfileImage.Image.Size.Height);
             }
 
-            addUserLayout.Dispose();
-            editProfileInputTextLayout.Dispose();
+            //set up utility buttons
+            utilityButtonScales.addUserScale = 1f;
+            utilityButtonScales.settingsScale = 1f;
 
-            whosPlayingLayout.Dispose();
+            utilityButtonImages.addUserImage = new BitmapImage("Media/add_user.png", deviceContext, imagingFactory);
+            utilityButtonImages.settingsImage = new BitmapImage("Media/settings.png", deviceContext, imagingFactory);
+
+            editProfileBitmap = new BitmapImage("Media/edit.png", deviceContext, imagingFactory);
+
+            StrokeStyleProperties strokeProperties = new StrokeStyleProperties()
+            {
+                StartCap = CapStyle.Round,
+                EndCap = CapStyle.Round,
+                LineJoin = LineJoin.Round,
+                DashStyle = DashStyle.Solid,
+            };
+
+            addUserStrokeStyle = new StrokeStyle(deviceContext.Factory, strokeProperties);
+
+            //set up input images
+            inputImageMouseRightClick = new BitmapImage("Media/mouse_right_click.png", deviceContext, imagingFactory);
+            inputImageSpacebar = new BitmapImage("Media/spacebar.png", deviceContext, imagingFactory);
+            inputImageXboxYButton = new BitmapImage("Media/xbox_y_button.png", deviceContext, imagingFactory);
 
             createSizeDependantResources(deviceContext);
+            targetStartX = profilePadding;
+
+            //start the stopwatch
+            sw.Start();
+
+
+            //setup inputs
+            InputManager.OnMousePosChanged += inputMousePosChanged;
+            InputManager.OnLeftMouseInput += inputMouseLeftClick;
+            InputManager.OnRightMouseInput += inputMouseRightClick;
+            InputManager.OnLeftInput += inputLeft;
+            InputManager.OnRightInput += inputRight;
+            InputManager.OnUpInput += inputUp;
+            InputManager.OnDownInput += inputDown;
+            InputManager.OnEnterInput += inputEnter;
+            InputManager.OnAltEnterInput += inputAltEnter;
+            InputManager.OnBackInput += inputBack;
+            InputManager.OnMouseScroll += inputScroll;
         }
 
-        public override void Update()
-        {
-            //if we are not the currently active form then do nothing
-            Form activeForm = System.Windows.Forms.Form.ActiveForm;
-            if (activeForm == null)
-                return;
-
-            //this is updated throughout the method and used at the end to determine what action to take
-            Inputs inputs = Inputs.None;
-
-            //this is also used at the end to compare if anything changed
-            (int user, int utility, InputLayers layer) oldIndex;
-            oldIndex.user = selectedUserIndex;
-            oldIndex.utility = selectedUtilityIndex;
-            oldIndex.layer = currentInputLayer;
-
-            //mouse input
-            System.Drawing.Point currentMousePos = System.Windows.Forms.Cursor.Position;
-            /*
-            //if something happened with the mouse then continue
-            if (currentMousePos != oldMousePos || mouseLeftButtonReleased || mouseRightButtonReleased || ((lastMouseUserSelectedTime + 200 < sw.ElapsedMilliseconds) && currentInputType == InputType.Mouse))
-            {
-                //gets the current mouse position and converts it to a vector2
-                System.Drawing.Point mouseToScreen = activeForm.PointToClient(currentMousePos);
-                Vector2 mousePos = new Vector2(mouseToScreen.X, mouseToScreen.Y);
-
-                currentInputType = InputType.Mouse;
-
-                //using distance squared throughout this for better performance
-                //check for cursor over the 'add user' button
-                if (Vector2.DistanceSquared(utilityButtonPositions.addUserPosition, mousePos) < (utilityButtonSize / 2 * utilityButtonScales.addUserScale) * (utilityButtonSize / 2 * utilityButtonScales.addUserScale))
+        public override void Resize(DeviceContext deviceContext)
                 {
-                    //set the current input layer
-                    currentInputLayer = InputLayers.Utilities;
+                    this.deviceContext = deviceContext;
 
-                    //set the current index
-                    selectedUtilityIndex = 0;
+                    colorBrush.Dispose();
+                    backgroundGradientBrush.Dispose();
 
-                    //set our input selection
-                    if (mouseLeftButtonReleased)
-                        inputs = Inputs.Enter;
-                    
-                }
-                //check for cursor over the 'settings' button
-                else if (Vector2.DistanceSquared(utilityButtonPositions.settingsPosition, mousePos) < (utilityButtonSize / 2 * utilityButtonScales.settingsScale) * (utilityButtonSize / 2 * utilityButtonScales.settingsScale))
-                {
-                    //set the current input layer
-                    currentInputLayer = InputLayers.Utilities;
-
-                    //set the current index
-                    selectedUtilityIndex = 1;
-
-                    //set our input selection
-                    if (mouseLeftButtonReleased)
-                        inputs = Inputs.Enter;
-                }
-                else if(users.Length == 0 && Vector2.DistanceSquared(new Vector2(deviceContext.Size.Width / 2, deviceContext.Size.Height / 2), mousePos) < profilePictureSize * currentAddUserScale / 2 * (profilePictureSize * currentAddUserScale / 2))
-                {
-                    currentInputLayer = InputLayers.Users;
-                    selectedUserIndex = 0;
-
-                    if(mouseLeftButtonReleased)
-                        inputs = Inputs.Enter;
-                }
-                //check for cursor over the user profile buttons
-                else
-                {
-                    for (int i = 0; i < users.Length; i++)
+                    for(int i = 0; i < users.Length; i++)
                     {
-                        //get the center of the profile in screen coordinates
-                        Vector2 profileCenter = new Vector2(users[i].ScreenPosition.X + (profilePictureSize * users[i].CurrentSelectedScale / 2), users[i].ScreenPosition.Y + (profilePictureSize * users[i].CurrentSelectedScale / 2));
-
-                        if (Vector2.DistanceSquared(profileCenter, mousePos) < (profilePictureSize / 2 * users[i].CurrentSelectedScale) * (profilePictureSize / 2 * users[i].CurrentSelectedScale))
-                        {
-                            if (currentMousePos != oldMousePos)
-                            {
-                                //set the current profile index
-                                selectedUserIndex = i;
-
-                                lastMouseUserSelectedTime = sw.ElapsedMilliseconds;
-                            }
-
-                            if (currentInputLayer != InputLayers.Users && currentInputLayer != InputLayers.EditProfile)
-                                //sets the current input layer
-                                currentInputLayer = InputLayers.Users;
-
-                            if (currentInputLayer == InputLayers.EditProfile)
-                            {
-                                isCursorOverEditButton = Vector2.DistanceSquared(profileCenter, mousePos) < (editProfileSize * users[i].CurrentSelectedScale / 2) * (editProfileSize * users[i].CurrentSelectedScale / 2);
-
-                                if (oldIndex.user != selectedUserIndex)
-                                    currentInputLayer = InputLayers.Users;
-                            }
-
-                            //set our input selection
-                            if (mouseLeftButtonReleased)
-                                inputs = Inputs.Enter;
-                            else if (mouseRightButtonReleased)
-                                inputs = Inputs.AltEnter;
-                        }
+                        users[i].Layout.Dispose();
                     }
+
+                    addUserLayout.Dispose();
+                    editProfileInputTextLayout.Dispose();
+
+                    whosPlayingLayout.Dispose();
+
+                    createSizeDependantResources(deviceContext);
                 }
 
-                if (currentInputType == InputType.Mouse && lastMouseUserSelectedTime + 200 < sw.ElapsedMilliseconds && mousePos.Y < deviceContext.Size.Height / 2 + profilePictureSize / 2 && mousePos.Y > deviceContext.Size.Height / 2 - profilePictureSize / 2) {
-                    if (mousePos.X < edgeMouseSelectionThickness && mousePos.X > -1)
-                    {
-                        //left side of screen
-                        selectedUserIndex = clamp(selectedUserIndex - 1, 0, users.Length - 1);
-                        lastMouseUserSelectedTime = sw.ElapsedMilliseconds;
-                    }
-                    else if(mousePos.X > deviceContext.Size.Width - edgeMouseSelectionThickness && mousePos.X < deviceContext.Size.Width + 1)
-                    {
-                        selectedUserIndex = clamp(selectedUserIndex + 1, 0, users.Length - 1);
-                        lastMouseUserSelectedTime = sw.ElapsedMilliseconds;
-                    }
-                }
-
-            }
-            */
-
-            //keyboard input
-            //get the current keyboard state
-            KeyState[] currentKeyState = new KeyState[monitorKeys.Length];
-
-            for (int i = 0; i < monitorKeys.Length; i++)
-            {
-                //set the currentKeyState based on what keys we want to monitor
-                //  (defined in the header of this class)
-                bool isPressed = Keyboard.IsKeyDown(monitorKeys[i]);
-                currentKeyState[i] = new KeyState
-                {
-                    key = monitorKeys[i],
-                    isPressed = isPressed,
-                };
-            }
-
-            //do things based on what was pressed
-            for (int i = 0; i < monitorKeys.Length; i++)
-            {
-                if (currentKeyState[i].isPressed && !oldKeyState[i].isPressed)
-                {
-                    currentInputType = InputType.Keyboard;
-
-                    switch (currentKeyState[i].key)
-                    {
-                        case Key.Left:
-                            inputs = Inputs.Left;
-                            break;
-                        case Key.Right:
-                            inputs = Inputs.Right;
-                            break;
-                        case Key.Up:
-                            inputs = Inputs.Up;
-                            break;
-                        case Key.Down:
-                            inputs = Inputs.Down;
-                            break;
-                        case Key.Enter:
-                            inputs = Inputs.Enter;
-                            break;
-                        case Key.Space:
-                            inputs = Inputs.AltEnter;
-                            break;
-                        case Key.Escape:
-                            inputs = Inputs.Back;
-                            break;
-
-                    }
-
-                }
-            }
-
-            //controller input
-            if (lastControllerReconnectTime + 5000 < sw.ElapsedMilliseconds)
-                reconnectControllers();
-
-            for (int controller = 0; controller < controllers.Length; controller++)
-            {
-                //don't do anything if the controller isn't connected
-                if (controllers[controller].IsConnected)
-                {
-                    //get the current state and the old state for comparison
-                    State currentControllerState = controllers[controller].GetState();
-                    State compareState = oldControllerState[controller];
-
-                    //if the left stick is past the dead zone this time and short the dead zone last time OR the d-pad is pressed
-                    if (((float)currentControllerState.Gamepad.LeftThumbX / short.MaxValue > deadZone && ((float)compareState.Gamepad.LeftThumbX / short.MaxValue) < deadZone) ||
-                            (currentControllerState.Gamepad.Buttons & GamepadButtonFlags.DPadRight) == GamepadButtonFlags.DPadRight && (compareState.Gamepad.Buttons & GamepadButtonFlags.DPadRight) == 0)
-                    {
-                        inputs = Inputs.Right;
-                        currentInputType = InputType.Controller;
-                    }
-                    //same for this one except for left
-                    else if (((float)currentControllerState.Gamepad.LeftThumbX / short.MaxValue * -1f > deadZone && (float)compareState.Gamepad.LeftThumbX / short.MaxValue * -1f < deadZone) ||
-                        (currentControllerState.Gamepad.Buttons & GamepadButtonFlags.DPadLeft) == GamepadButtonFlags.DPadLeft && (compareState.Gamepad.Buttons & GamepadButtonFlags.DPadLeft) == 0)
-                    {
-                        inputs = Inputs.Left;
-                        currentInputType = InputType.Controller;
-                    }
-                    //and for down
-                    else if (((float)currentControllerState.Gamepad.LeftThumbY / short.MaxValue * -1f > deadZone && (float)compareState.Gamepad.LeftThumbY / short.MaxValue * -1f < deadZone) ||
-                        (currentControllerState.Gamepad.Buttons & GamepadButtonFlags.DPadDown) == GamepadButtonFlags.DPadDown && (compareState.Gamepad.Buttons & GamepadButtonFlags.DPadDown) == 0)
-                    {
-                        inputs = Inputs.Down;
-                        currentInputType = InputType.Controller;
-                    }
-                    //and for up
-                    else if (((float)currentControllerState.Gamepad.LeftThumbY / short.MaxValue > deadZone && (float)compareState.Gamepad.LeftThumbY / short.MaxValue < deadZone) ||
-                        (currentControllerState.Gamepad.Buttons & GamepadButtonFlags.DPadUp) == GamepadButtonFlags.DPadUp && (compareState.Gamepad.Buttons & GamepadButtonFlags.DPadUp) == 0)
-                    {
-                        inputs = Inputs.Up;
-                        currentInputType = InputType.Controller;
-                    }
-                    //see if the 'A' or 'X' button was pressed this frame
-                    else if (((currentControllerState.Gamepad.Buttons & GamepadButtonFlags.A) == GamepadButtonFlags.A || (currentControllerState.Gamepad.Buttons & GamepadButtonFlags.X) == GamepadButtonFlags.X) &&
-                        (compareState.Gamepad.Buttons & (GamepadButtonFlags.X | GamepadButtonFlags.A)) == 0)
-                    {
-                        inputs = Inputs.Enter;
-                        currentInputType = InputType.Controller;
-                    }
-                    //see if the 'Y' button was pressed this frame
-                    else if((currentControllerState.Gamepad.Buttons & GamepadButtonFlags.Y) == GamepadButtonFlags.Y && (compareState.Gamepad.Buttons & GamepadButtonFlags.Y) == 0)
-                    {
-                        inputs = Inputs.AltEnter;
-                        currentInputType = InputType.Controller;
-                    }
-                    //see if the 'B' button was pressed this frame
-                    else if((currentControllerState.Gamepad.Buttons & GamepadButtonFlags.B) == GamepadButtonFlags.B && (compareState.Gamepad.Buttons & GamepadButtonFlags.B) == 0)
-                    {
-                        inputs = Inputs.Back;
-                        currentInputType = InputType.Controller;
-                    }
-
-                    oldControllerState[controller] = currentControllerState;
-                }
-            }
-
-            //do things based on what inputs we got earlier
-            switch (inputs)
-            {
-                case Inputs.Left:
-                    if (currentInputLayer == InputLayers.EditProfile)
-                        currentInputLayer = InputLayers.Users;
-
-                    //change the index of different layers based on what layer we are currently on
-                    if (users.Length > 0 && selectedUserIndex >= 0 && currentInputLayer == InputLayers.Users)
-                    {
-                        selectedUserIndex = clamp(selectedUserIndex - 1, 0, users.Length - 1);
-                    }
-                    else if(currentInputLayer == InputLayers.Utilities)
-                    {
-                        selectedUtilityIndex = clamp(selectedUtilityIndex - 1, 0, 1);
-                    }
-
-                    break;
-
-                case Inputs.Right:
-                    if (currentInputLayer == InputLayers.EditProfile)
-                        currentInputLayer = InputLayers.Users;
-
-
-                    //change the index of different layers based on what layer we are currently on
-                    if (users.Length > 0 && selectedUserIndex >= 0 && currentInputLayer == InputLayers.Users)
-                    {
-                        selectedUserIndex = clamp(selectedUserIndex + 1, 0, users.Length - 1);
-                    }
-                    else if (currentInputLayer == InputLayers.Utilities)
-                    {
-                        selectedUtilityIndex = clamp(selectedUtilityIndex + 1, 0, 1);
-                    }
-                    break;
-
-                case Inputs.Up:
-                    //change the current input layer
-                    if (currentInputLayer == InputLayers.Utilities)
-                        currentInputLayer = InputLayers.Users;
-                    break;
-
-                case Inputs.Down:
-                    //change the current input layer
-                    if (currentInputLayer == InputLayers.Users || currentInputLayer == InputLayers.EditProfile)
-                    {
-                        currentInputLayer = InputLayers.Utilities;
-                        selectedUtilityIndex = 0;
-                    }
-                    break;
-
-                case Inputs.Enter:
-                    changePanel();
-                    break;
-
-                case Inputs.AltEnter:
-                    if (currentInputLayer == InputLayers.Users && users.Length > 0)
-                        currentInputLayer = InputLayers.EditProfile;
-                    else if (currentInputLayer == InputLayers.EditProfile)
-                        currentInputLayer = InputLayers.Users;
-                    break;
-
-                case Inputs.Back:
-                    switch (currentInputLayer)
-                    {
-                        case InputLayers.Utilities:
-                                currentInputLayer = InputLayers.Users;
-                            break;
-                        case InputLayers.EditProfile:
-                                currentInputLayer = InputLayers.Users;
-                            break;
-                        case InputLayers.Users:
-                            Application.Exit();
-                            break;
-                    }
-                    
-                    break;
-            }
-
-            //play a sound if a section changed
-            if (selectedUserIndex != oldIndex.user || selectedUtilityIndex != oldIndex.utility || currentInputLayer != oldIndex.layer)
-            {
-                selectionClickVoice = new SourceVoice(audioOut, profileClickStream.Format, false);
-                selectionClickVoice.SubmitSourceBuffer(selectionClickBuffer, profileClickStream.DecodedPacketsInfo);
-                selectionClickVoice.SetVolume(0.5f);
-                selectionClickVoice.Start();
-            }
-
-            //set old states for comparison next frame
-            oldMousePos = currentMousePos;
-            oldKeyState = currentKeyState;
-            mouseLeftButtonReleased = false;
-            mouseRightButtonReleased = false;
-        }
 
 
         private void changePanel()
@@ -897,7 +474,6 @@ namespace save_switcher.Panels
             //switch the panel based on what the current input selection is
             if (currentInputLayer == InputLayers.Users)
             {
-                Dispose();
                 //do the save swapping and start the game
                 if (users.Length > 0)
                     Program.ChangePanel<RunGame>(Program.GameID, users[selectedUserIndex].User.ID);
@@ -908,7 +484,6 @@ namespace save_switcher.Panels
             {
                 if (selectedUtilityIndex == 0)
                 {
-                    Dispose();
                     //switch to the add user panel
                     Program.ChangePanel<AddUser>(null);
                 }
@@ -1015,41 +590,204 @@ namespace save_switcher.Panels
 
         }
 
-        private void Dispose()
+        private void inputAltEnter(InputManager.ButtonTravel travel)
         {
-            utilityButtonImages.addUserImage.Image.Dispose();
-            utilityButtonImages.settingsImage.Image.Dispose();
-
-            for (int i = 0; i < users.Length; i++)
+            if (travel == InputManager.ButtonTravel.Down)
             {
-                users[i].ProfileGeometry.Dispose();
-                users[i].ProfileBrush.Dispose();
-                users[i].ProfileImage.Image.Dispose();
-                users[i].Layout.Dispose();
+                if (currentInputLayer == InputLayers.Users && users.Length > 0)
+                    currentInputLayer = InputLayers.EditProfile;
+                else if (currentInputLayer == InputLayers.EditProfile)
+                    currentInputLayer = InputLayers.Users;
+
+                updateState();
+            }
+        }
+
+        private void inputBack(InputManager.ButtonTravel travel)
+        {
+            if (travel == InputManager.ButtonTravel.Down)
+            {
+                switch (currentInputLayer)
+                {
+                    case InputLayers.Utilities:
+                        currentInputLayer = InputLayers.Users;
+                        break;
+                    case InputLayers.EditProfile:
+                        currentInputLayer = InputLayers.Users;
+                        break;
+                    case InputLayers.Users:
+                        Application.Exit();
+                        break;
+                }
+            }
+        }
+
+        private void inputDown(InputManager.ButtonTravel travel)
+        {
+            if (travel == InputManager.ButtonTravel.Down)
+            {
+                //change the current input layer
+                if (currentInputLayer == InputLayers.Users || currentInputLayer == InputLayers.EditProfile)
+                {
+                    currentInputLayer = InputLayers.Utilities;
+                    selectedUtilityIndex = 0;
+                }
+
+                updateState();
+            }
+        }
+
+        private void inputEnter(InputManager.ButtonTravel travel)
+        {
+            if (travel == InputManager.ButtonTravel.Down)
+            {
+                changePanel();
+            }
+        }
+
+        private void inputLeft(InputManager.ButtonTravel travel)
+        {
+            if (travel == InputManager.ButtonTravel.Down)
+            {
+                if (currentInputLayer == InputLayers.EditProfile)
+                    currentInputLayer = InputLayers.Users;
+
+                //change the index of different layers based on what layer we are currently on
+                if (users.Length > 0 && selectedUserIndex >= 0 && currentInputLayer == InputLayers.Users)
+                {
+                    selectedUserIndex = clamp(selectedUserIndex - 1, 0, users.Length - 1);
+                }
+                else if (currentInputLayer == InputLayers.Utilities)
+                {
+                    selectedUtilityIndex = clamp(selectedUtilityIndex - 1, 0, 1);
+                }
+
+                updateState();
+            }
+        }
+
+        private void inputMouseLeftClick(InputManager.ButtonTravel travel)
+        {
+            if (travel == InputManager.ButtonTravel.Up)
+            {
+                changePanel();
+            }
+        }
+
+        private void inputMouseRightClick(InputManager.ButtonTravel travel)
+        {
+            if (travel == InputManager.ButtonTravel.Up)
+            {
+                if (currentInputLayer == InputLayers.Users && users.Length > 0)
+                    currentInputLayer = InputLayers.EditProfile;
+
+                updateState();
+            }
+        }
+
+        private void inputMousePosChanged(System.Drawing.Point p)
+        {
+
+            Vector2 mousePos = new Vector2(p.X, p.Y);
+
+            //using distance squared throughout this for better performance
+            //check for cursor over the 'add user' button
+            if (Vector2.DistanceSquared(utilityButtonPositions.addUserPosition, mousePos) < (utilityButtonSize / 2 * utilityButtonScales.addUserScale) * (utilityButtonSize / 2 * utilityButtonScales.addUserScale))
+            {
+                //set the current input layer
+                currentInputLayer = InputLayers.Utilities;
+
+                //set the current index
+                selectedUtilityIndex = 0;
+            }
+            //check for cursor over the 'settings' button
+            else if (Vector2.DistanceSquared(utilityButtonPositions.settingsPosition, mousePos) < (utilityButtonSize / 2 * utilityButtonScales.settingsScale) * (utilityButtonSize / 2 * utilityButtonScales.settingsScale))
+            {
+                //set the current input layer
+                currentInputLayer = InputLayers.Utilities;
+
+                //set the current index
+                selectedUtilityIndex = 1;
+            }
+            else if (users.Length == 0 && Vector2.DistanceSquared(new Vector2(deviceContext.Size.Width / 2, deviceContext.Size.Height / 2), mousePos) < profilePictureSize * currentAddUserScale / 2 * (profilePictureSize * currentAddUserScale / 2))
+            {
+                currentInputLayer = InputLayers.Users;
+                selectedUserIndex = 0;
+            }
+            //check for cursor over the user profile buttons
+            else
+            {
+                for (int i = 0; i < users.Length; i++)
+                {
+                    //get the center of the profile in screen coordinates
+                    Vector2 profileCenter = new Vector2(users[i].ScreenPosition.X + (profilePictureSize * users[i].CurrentSelectedScale / 2), users[i].ScreenPosition.Y + (profilePictureSize * users[i].CurrentSelectedScale / 2));
+
+                    if (Vector2.DistanceSquared(profileCenter, mousePos) < (profilePictureSize / 2 * users[i].CurrentSelectedScale) * (profilePictureSize / 2 * users[i].CurrentSelectedScale))
+                    {
+
+                        //set the current profile index
+                        selectedUserIndex = i;
+
+
+                        if (currentInputLayer != InputLayers.Users && currentInputLayer != InputLayers.EditProfile)
+                            //sets the current input layer
+                            currentInputLayer = InputLayers.Users;
+
+                        if (currentInputLayer == InputLayers.EditProfile)
+                        {
+                            isCursorOverEditButton = Vector2.DistanceSquared(profileCenter, mousePos) < (editProfileSize * users[i].CurrentSelectedScale / 2) * (editProfileSize * users[i].CurrentSelectedScale / 2);
+
+                            if (selectedUserIndex != oldPanelstate.selectedUserIndex)
+                                currentInputLayer = InputLayers.Users;
+                        }
+                    }
+                }
             }
 
-            whosPlayingLayout.Dispose();
+            updateState();
+        }
 
-            editProfileInputTextLayout.Dispose();
+        private void inputRight(InputManager.ButtonTravel travel)
+        {
+            if (travel == InputManager.ButtonTravel.Down)
+            {
+                if (currentInputLayer == InputLayers.EditProfile)
+                    currentInputLayer = InputLayers.Users;
 
-            colorBrush.Dispose();
-            backgroundGradientBrush.Dispose();
+                //change the index of different layers based on what layer we are currently on
+                if (currentInputLayer == InputLayers.Users && users.Length > 0 && selectedUserIndex >= 0)
+                {
+                    selectedUserIndex = clamp(selectedUserIndex + 1, 0, users.Length - 1);
+                }
+                else if (currentInputLayer == InputLayers.Utilities)
+                {
+                    selectedUtilityIndex = clamp(selectedUtilityIndex + 1, 0, 1);
+                }
 
-            if (selectionClickVoice != null)
-                selectionClickVoice.Dispose();
+                updateState();
+            }
+        }
 
-            audioOut.Dispose();
-            profileClickStream.Dispose();
+        private void inputScroll(int delta)
+        {
+            if (delta > 0)
+                selectedUserIndex = clamp(selectedUserIndex + 1, 0, users.Length - 1);
+            else if (delta < 0)
+                selectedUserIndex = clamp(selectedUserIndex - 1, 0, users.Length - 1);
 
-            utilityButtonImages.addUserImage.Image.Dispose();
-            utilityButtonImages.settingsImage.Image.Dispose();
-            editProfileBitmap.Image.Dispose();
-            addUserStrokeStyle.Dispose();
-            inputImageMouseRightClick.Image.Dispose();
-            inputImageSpacebar.Image.Dispose();
-            inputImageXboxYButton.Image.Dispose();
+            updateState();
+        }
 
-            sw.Stop();
+        private void inputUp(InputManager.ButtonTravel travel)
+        {
+            if (travel == InputManager.ButtonTravel.Down)
+            {
+                //change the current input layer
+                if (currentInputLayer == InputLayers.Utilities)
+                    currentInputLayer = InputLayers.Users;
+
+                updateState();
+            }
         }
 
         private float lerp(float start, float end, float amount)
@@ -1063,29 +801,25 @@ namespace save_switcher.Panels
 
         }
 
-        private void reconnectControllers()
+        private void playSound()
         {
-            List<Controller> connectedControllers = new List<Controller>();
-            List<State> connectedControllersState = new List<State>();
+            selectionClickVoice = new SourceVoice(audioOut, profileClickStream.Format, false);
+            selectionClickVoice.SubmitSourceBuffer(selectionClickBuffer, profileClickStream.DecodedPacketsInfo);
+            selectionClickVoice.SetVolume(0.5f);
+            selectionClickVoice.Start();
+        }
 
-            //for each controller that is connected, save it into the list
-            for (int i = 0; i < 4; i++)
+        private void updateState()
+        {
+            (int selectedUserIndex, int selectedUtilityIndex, InputLayers currentInputLayer) state =
+                (selectedUserIndex, selectedUtilityIndex, currentInputLayer);
+
+            if(state != oldPanelstate)
             {
-                Controller testController = new Controller((UserIndex)i - 1);
-                
-
-                if (testController.IsConnected)
-                {
-                    connectedControllers.Add(testController);
-                    connectedControllersState.Add(testController.GetState());
-                }
+                playSound();
             }
 
-            //use those lists to populate these arrays
-            controllers = connectedControllers.ToArray();
-            oldControllerState = connectedControllersState.ToArray();
-
-            lastControllerReconnectTime = sw.ElapsedMilliseconds;
+            oldPanelstate = state;
         }
     }
 }
