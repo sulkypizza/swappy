@@ -15,6 +15,7 @@ namespace save_switcher
         {
             Up,
             Down,
+            Press,
         }
 
         public enum InputType
@@ -27,9 +28,13 @@ namespace save_switcher
         public static InputType CurrentInputType { get; private set; }
 
         public delegate void ButtonInput(ButtonTravel travel);
+        public delegate void CharacterButtonInput(ButtonTravel travel, char character);
         public delegate void PositionChanged(Point position);
         public delegate void InputDelta(int delta);
 
+
+        private static Dictionary<int, List<WeakReference>> characterInputEvents = new Dictionary<int, List<WeakReference>>();
+        public static event CharacterButtonInput OnCharacterInput { add => addEvent(characterInputEvents, value); remove => removeEvent(characterInputEvents, value); }
 
         private static Dictionary<int, List<WeakReference>> leftInputEvents = new Dictionary<int, List<WeakReference>>();
         public static event ButtonInput OnLeftInput { add => addEvent(leftInputEvents, value); remove => removeEvent(leftInputEvents, value); }
@@ -46,8 +51,8 @@ namespace save_switcher
         private static Dictionary<int, List<WeakReference>> enterInputEvents = new Dictionary<int, List<WeakReference>>();
         public static event ButtonInput OnEnterInput { add => addEvent(enterInputEvents, value); remove => removeEvent(enterInputEvents, value); }
 
-        private static Dictionary<int, List<WeakReference>> altEnterInputEvents = new Dictionary<int, List<WeakReference>>();
-        public static event ButtonInput OnAltEnterInput { add => addEvent(altEnterInputEvents, value); remove => removeEvent(altEnterInputEvents, value); }
+        private static Dictionary<int, List<WeakReference>> spaceInputEvents = new Dictionary<int, List<WeakReference>>();
+        public static event ButtonInput OnAltEnterInput { add => addEvent(spaceInputEvents, value); remove => removeEvent(spaceInputEvents, value); }
 
         private static Dictionary<int, List<WeakReference>> backInputEvents = new Dictionary<int, List<WeakReference>>();
         public static event ButtonInput OnBackInput { add => addEvent(backInputEvents, value); remove => removeEvent(backInputEvents, value); }
@@ -79,7 +84,7 @@ namespace save_switcher
                 upInputEvents,
                 downInputEvents,
                 enterInputEvents,
-                altEnterInputEvents,
+                spaceInputEvents,
                 backInputEvents,
                 leftMouseInputEvents,
                 rightMouseInputEvents,
@@ -87,7 +92,7 @@ namespace save_switcher
                 mouseScrollChanged,
             };
 
-            Timer timer = new Timer() { Interval = 250 };
+            Timer timer = new Timer() { Interval = 50 };
             timer.Tick += (_,__) => { update(); };
             timer.Start();
 
@@ -96,6 +101,16 @@ namespace save_switcher
             controllerReconnectTimer.Start();
 
             reconnectControllers();
+
+
+            Application.ApplicationExit += (_, __) =>
+            {
+                timer.Stop();
+                controllerReconnectTimer.Stop();
+
+                timer.Dispose();
+                controllerReconnectTimer.Dispose();
+            };
         }
 
         public static void CleanupNullEvents()
@@ -168,11 +183,14 @@ namespace save_switcher
                         break;
 
                     case Keys.Space:
-                        list = altEnterInputEvents;
+                        list = spaceInputEvents;
                         break;
 
                     case Keys.Escape:
                         list = backInputEvents;
+                        break;
+                    default:
+
                         break;
                 }
 
@@ -204,7 +222,7 @@ namespace save_switcher
         }
 
 
-        private static void addEvent<T>(IDictionary<int, List<WeakReference>> list, T addEvent) where T : Delegate
+        private static void addEvent(IDictionary<int, List<WeakReference>> list, Delegate addEvent)
         {
             List<WeakReference> eventList;
             if (!list.TryGetValue(addEvent.Target.GetHashCode(), out eventList))
@@ -213,6 +231,8 @@ namespace save_switcher
                 eventList.Add(new WeakReference(addEvent));
 
             keepAlive.GetOrCreateValue(addEvent.Target).Add(addEvent);
+
+            Debug.WriteLine(new WeakReference(addEvent).Target);
         }
 
 
@@ -285,7 +305,7 @@ namespace save_switcher
             oldControllerState = connectedControllersState.ToArray();
         }
 
-        private static void removeEvent<T>(IDictionary<int, List<WeakReference>> list, T addEvent) where T : Delegate
+        private static void removeEvent(IDictionary<int, List<WeakReference>> list, Delegate addEvent)
         {
             List<WeakReference> eventList;
             if (list.TryGetValue(addEvent.Target.GetHashCode(), out eventList))
@@ -302,7 +322,7 @@ namespace save_switcher
 
         private static void update()
         {
-            float controllerDeadZone = 0.8f;
+            float controllerDeadZone = 0.7f;
             for (int controller = 0; controller < controllers.Length; controller++)
             {
                 //don't do anything if the controller isn't connected
@@ -317,14 +337,14 @@ namespace save_switcher
                             (currentControllerState.Gamepad.Buttons & GamepadButtonFlags.DPadRight) == GamepadButtonFlags.DPadRight && (compareState.Gamepad.Buttons & GamepadButtonFlags.DPadRight) == 0)
                     {
                         CurrentInputType = InputType.Controller;
-                        invokeEvents(leftInputEvents, ButtonTravel.Down);
+                        invokeEvents(rightInputEvents, ButtonTravel.Down);
                     }
                     //same for this one except for left
                     else if (((float)currentControllerState.Gamepad.LeftThumbX / short.MaxValue * -1f > controllerDeadZone && (float)compareState.Gamepad.LeftThumbX / short.MaxValue * -1f < controllerDeadZone) ||
                         (currentControllerState.Gamepad.Buttons & GamepadButtonFlags.DPadLeft) == GamepadButtonFlags.DPadLeft && (compareState.Gamepad.Buttons & GamepadButtonFlags.DPadLeft) == 0)
                     {
                         CurrentInputType = InputType.Controller;
-                        invokeEvents(rightInputEvents, ButtonTravel.Down);
+                        invokeEvents(leftInputEvents, ButtonTravel.Down);
                     }
                     //and for down
                     else if (((float)currentControllerState.Gamepad.LeftThumbY / short.MaxValue * -1f > controllerDeadZone && (float)compareState.Gamepad.LeftThumbY / short.MaxValue * -1f < controllerDeadZone) ||
@@ -351,7 +371,7 @@ namespace save_switcher
                     else if ((currentControllerState.Gamepad.Buttons & GamepadButtonFlags.Y) == GamepadButtonFlags.Y && (compareState.Gamepad.Buttons & GamepadButtonFlags.Y) == 0)
                     {
                         CurrentInputType = InputType.Controller;
-                        invokeEvents(altEnterInputEvents, ButtonTravel.Down);
+                        invokeEvents(spaceInputEvents, ButtonTravel.Down);
                     }
                     //see if the 'B' button was pressed this frame
                     else if ((currentControllerState.Gamepad.Buttons & GamepadButtonFlags.B) == GamepadButtonFlags.B && (compareState.Gamepad.Buttons & GamepadButtonFlags.B) == 0)
