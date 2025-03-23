@@ -1,4 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Windows.Ink;
 
 namespace save_switcher.Elements
 {
@@ -11,7 +15,7 @@ namespace save_switcher.Elements
         Right = 0x01,
     };
 
-    abstract class InputNavigable
+    abstract class InputNavigable : IDisposable
     {
 
         protected static InputNavigable CurrentSelectedObject;
@@ -50,6 +54,14 @@ namespace save_switcher.Elements
         }
 
         public abstract void Deselect();
+
+        public void Dispose()
+        {
+            if (CurrentSelectedObject == this)
+            {
+                CurrentSelectedObject = null;
+            }
+        }
 
         public static void ConnectNeighbors(InputNavigable a, InputNavigable b, NavigateDirection directionAtoB)
         {
