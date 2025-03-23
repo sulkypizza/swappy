@@ -231,8 +231,6 @@ namespace save_switcher
                 eventList.Add(new WeakReference(addEvent));
 
             keepAlive.GetOrCreateValue(addEvent.Target).Add(addEvent);
-
-            Debug.WriteLine(new WeakReference(addEvent).Target);
         }
 
 
