@@ -31,7 +31,13 @@ namespace save_switcher.Panels
 
             createSizeDependantResources();
 
-            InputManager.OnBackInput += inputBack;
+            InputManager.OnBackInput += (travel) =>
+            {
+                if (travel == InputManager.ButtonTravel.Down)
+                {
+                    Program.ChangePanel<ProfileSelector>();
+                }
+            };
         }
 
         public void Dispose()
@@ -40,6 +46,7 @@ namespace save_switcher.Panels
 
             addGameButton.Dispose();
             addSyncButton.Dispose();
+            listGamesButton.Dispose();
         }
 
         private void createSizeDependantResources()
@@ -529,14 +536,6 @@ namespace save_switcher.Panels
             f.Controls.Add(cancelButton);
 
             f.ShowDialog();
-        }
-
-        private void inputBack(InputManager.ButtonTravel travel)
-        {
-            if (travel == InputManager.ButtonTravel.Down)
-            {
-                Program.ChangePanel<ProfileSelector>();
-            }
         }
     }
 }
