@@ -821,10 +821,13 @@ namespace save_switcher.Panels
 
         private void playSelectedSound()
         {
-            selectionClickVoice = new SourceVoice(audioOut, profileClickStream.Format, false);
-            selectionClickVoice.SubmitSourceBuffer(selectionClickBuffer, profileClickStream.DecodedPacketsInfo);
-            selectionClickVoice.SetVolume(0.5f);
-            selectionClickVoice.Start();
+            if (profileClickStream != null)
+            {
+                selectionClickVoice = new SourceVoice(audioOut, profileClickStream.Format, false);
+                selectionClickVoice.SubmitSourceBuffer(selectionClickBuffer, profileClickStream.DecodedPacketsInfo);
+                selectionClickVoice.SetVolume(0.5f);
+                selectionClickVoice.Start();
+            }
         }
 
         private void updateSelection()
