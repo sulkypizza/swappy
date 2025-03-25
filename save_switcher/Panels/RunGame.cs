@@ -184,9 +184,7 @@ namespace save_switcher.Panels
                     {
                         gameProcessExited = true;
 
-                        Program.GetProgramForm().Invoke(
-                            new Action( () => { Program.GetProgramForm().Activate(); } 
-                        ));
+                        Program.ActivateForm();
                     };
 
                 }

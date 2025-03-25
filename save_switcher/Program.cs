@@ -6,6 +6,7 @@ using SharpDX.Direct3D11;
 using SharpDX.DXGI;
 using SharpDX.Windows;
 using System;
+using System.Runtime.CompilerServices;
 using System.Windows.Forms;
 using System.Windows.Input;
 using AlphaMode = SharpDX.Direct2D1.AlphaMode;
@@ -253,9 +254,9 @@ namespace save_switcher
             return deviceContext;
         }
 
-        public static Form GetProgramForm()
+        public static void ActivateForm()
         {
-            return programForm;
+            programForm.Invoke(new Action(() => { programForm.Activate(); }) );
         }
 
         public static SharpDX.DirectWrite.Factory GetDirectWriteFactory()
