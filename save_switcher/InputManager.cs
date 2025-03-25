@@ -28,7 +28,7 @@ namespace save_switcher
         public static InputType CurrentInputType { get; private set; }
 
         public delegate void ButtonInput(ButtonTravel travel);
-        public delegate void CharacterButtonInput(ButtonTravel travel, char character);
+        public delegate void CharacterButtonInput(char character);
         public delegate void PositionChanged(Point position);
         public delegate void InputDelta(int delta);
 
@@ -189,9 +189,6 @@ namespace save_switcher
                     case Keys.Escape:
                         list = backInputEvents;
                         break;
-                    default:
-
-                        break;
                 }
 
                 if (list != null)
@@ -210,7 +207,10 @@ namespace save_switcher
                 invokeKeyInput(e, ButtonTravel.Up);
             };
 
-            //form.KeyPress += new System.Windows.Forms.KeyPressEventHandler(OnKeyPress);
+            form.KeyPress += (object sender, KeyPressEventArgs e) =>
+            {
+                invokeEvents(characterInputEvents, e.KeyChar);
+            };
         }
 
         public static void RemoveEventsFromObject(object obj)
