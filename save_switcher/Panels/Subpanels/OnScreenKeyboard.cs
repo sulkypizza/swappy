@@ -1,6 +1,7 @@
 ﻿using save_switcher.Elements;
 using SharpDX;
 using SharpDX.Direct2D1;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
@@ -8,7 +9,7 @@ using System.Windows.Forms;
 namespace save_switcher.Panels.Subpanels
 {
 
-    internal class OnScreenKeyboard : Subpanel<char, object>
+    internal class OnScreenKeyboard : Subpanel<char, object>, IDisposable
     {
 
         char[][] keyLayout =
@@ -95,7 +96,12 @@ namespace save_switcher.Panels.Subpanels
 
                     KeyboardButtonCharacter kb = new KeyboardButtonCharacter(this, deviceContext, pos, size, keyLayout[i][key]);
 
-                    kb.OnPressed += characterButtonPress;
+                    kb.OnPressed += () => {
+                        if (ShiftStates.activated && !ShiftStates.locked)
+                        {
+                            ShiftStates.activated = false;
+                        }
+                    };
 
                     //add naigation paths
                     KeyboardButton outButton;
@@ -151,40 +157,16 @@ namespace save_switcher.Panels.Subpanels
                 }
             }
 
-            //initialize gamepad controllers
-            buttons.First().Value.ConnectControllers();
             buttons.First().Value.Select();
 
-            Program.GetProgramForm().KeyPress += keyPressFunction;
-
-            Program.GetProgramForm().KeyUp += keyUpFunction;
+            InputManager.OnBackInput += (t) =>
+            {
+                if(t == InputManager.ButtonTravel.Down)
+                    Deactivate();
+            };
         }
 
         public event SubpanelExitEvent<object> OnExit;
-
-        public event SubpanelUpdateEvent<char> OnUpdate;
-
-        public event SubpanelExitEvent<KeyEventArgs> OnRawKey;
-
-        private void keyUpFunction(object sender, KeyEventArgs args)
-        {
-            if (args.KeyCode == Keys.Escape)
-                    Deactivate();
-                else OnRawKey(args);
-        }
-
-        private void keyPressFunction(object sender, KeyPressEventArgs args)
-        {
-            OnUpdate(args.KeyChar);
-        }
-
-        private void characterButtonPress()
-        {
-            if (ShiftStates.activated && !ShiftStates.locked)
-            {
-                ShiftStates.activated = false;
-            }
-        }
 
         public void Activate()
         {
@@ -192,17 +174,20 @@ namespace save_switcher.Panels.Subpanels
         }
 
         public void Deactivate()
-        {
-            Form form = Program.GetProgramForm();
-            form.KeyPress -= keyPressFunction;
-            form.KeyUp -= keyUpFunction;
+        { 
+            OnExit?.Invoke(this);
 
-            foreach(var b in buttons)
+            Dispose();
+        }
+
+        public void Dispose()
+        {
+            foreach (var b in buttons)
             {
-                b.Value.OnPressed -= characterButtonPress;
                 b.Value.Dispose();
             }
-            OnExit?.Invoke(this);
+
+            InputManager.RemoveEventsFromObject(this);
         }
 
         public void Update()

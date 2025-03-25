@@ -55,7 +55,7 @@ namespace save_switcher.Elements
 
         public abstract void Deselect();
 
-        public void Dispose()
+        public virtual void Dispose()
         {
             if (CurrentSelectedObject == this)
             {

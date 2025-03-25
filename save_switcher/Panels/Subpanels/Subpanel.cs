@@ -10,8 +10,6 @@ namespace save_switcher.Panels.Subpanels
     {
         event SubpanelExitEvent<TExit> OnExit;
 
-        event SubpanelUpdateEvent<TUpdate> OnUpdate;
-
         void Activate();
 
         void Deactivate();

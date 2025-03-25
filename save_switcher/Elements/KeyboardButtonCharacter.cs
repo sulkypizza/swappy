@@ -34,6 +34,14 @@ namespace save_switcher.Elements
             createSizeDependantResources();
         }
 
+        public override void Dispose()
+        {
+            characterLayoutLowercase.Dispose();
+            characterLayoutUppercase.Dispose();
+
+            base.Dispose();
+        }
+
         public override void Draw()
         {
             base.Draw();

@@ -10,8 +10,8 @@ namespace save_switcher.Elements
 
     internal class KeyboardButtonShift : KeyboardButton
     {
-        public event PressedEvent OnShiftLockPressed;
-        public event PressedEvent OnShiftPressed;
+        public event ButtonEvent OnShiftLockPressed;
+        public event ButtonEvent OnShiftPressed;
 
         private OnScreenKeyboard parent;
 

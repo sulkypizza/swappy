@@ -255,14 +255,44 @@ namespace save_switcher.Panels
             updateSelection();
         }
 
-        private void inputCharacter(InputManager.ButtonTravel travel, char c)
+        private void inputCharacter(char c)
         {
-            if (OSKeyboard != null)
-                return;
+            if (username == null)
+                username = "";
 
-            if (travel != InputManager.ButtonTravel.Up)
+            int typedKey = c;
+            //key 8 = backspace, 9 = tab, 13 = enter, 27 = escape, 127 = ctl + backspace
+            if (typedKey == 8 || typedKey == 127)
             {
-                typeUsername(c);
+                //backspace
+
+                if (username == null)
+                    username = "";
+
+                if (typedKey == 127)
+                {
+                    string[] splitUsername = username.Split(' ');
+                    string[] destSplitUsername = new string[splitUsername.Length - 1];
+                    Array.Copy(splitUsername, destSplitUsername, splitUsername.Length - 1);
+
+                    username = string.Join(" ", destSplitUsername);
+                }
+                else if (username.Length > 0)
+                    username = username.Substring(0, username.Length - 1);
+
+                usernameLayout.Dispose();
+                usernameLayout = new TextLayout(directWriteFactory, username, usernameTextFormat, 1000f, 100f);
+            }
+            else if (typedKey != 9 && typedKey != 13 && typedKey != 27 &&
+                !bannedUsernameChars.Contains(c))
+            {
+                if (username.Length + 1 <= usernameLimit)
+                    username = username + c;
+
+                showEmptyError.username = false;
+
+                usernameLayout.Dispose();
+                usernameLayout = new TextLayout(directWriteFactory, username, usernameTextFormat, 1000f, 100f);
             }
 
             updateSelection();
@@ -414,17 +444,6 @@ namespace save_switcher.Panels
                         OSKeyboard.OnExit += (object o) =>
                         {
                             OSKeyboard = null;
-                        };
-
-                        OSKeyboard.OnUpdate += (char c) =>
-                        {
-                            typeUsername(c);
-                        };
-
-                        OSKeyboard.OnRawKey += (KeyEventArgs args) =>
-                        {
-                            if (args.KeyCode == Keys.Back)
-                                backspaceUsername(args.Control);
                         };
                     }
                 }
@@ -602,47 +621,6 @@ namespace save_switcher.Panels
             }
 
             updateSelection();
-        }
-
-        private void backspaceUsername(bool wordDelete)
-        {
-            if (username == null)
-                username = "";
-
-            if (wordDelete)
-            {
-                string[] splitUsername = username.Split(' ');
-                string[] destSplitUsername = new string[splitUsername.Length - 1];
-                Array.Copy(splitUsername, destSplitUsername, splitUsername.Length - 1);
-
-                username = string.Join(" ", destSplitUsername);
-            }
-            else if(username.Length > 0)
-                username = username.Substring(0, username.Length - 1);
-
-            usernameLayout.Dispose();
-            usernameLayout = new TextLayout(directWriteFactory, username, usernameTextFormat, 1000f, 100f);
-            
-        }
-
-        private void typeUsername(char c)
-        {
-            if (username == null)
-                username = "";
-
-            int typedKey = c;
-            //key 8 = backspace, 9 = tab, 13 = enter, 27 = esacape
-            if (typedKey != 8 && typedKey != 9 && typedKey != 13 && typedKey != 27 &&
-                !bannedUsernameChars.Contains(c))
-            {
-                if (username.Length + 1 <= usernameLimit)
-                    username = username + c;
-
-                showEmptyError.username = false;
-
-                usernameLayout.Dispose();
-                usernameLayout = new TextLayout(directWriteFactory, username, usernameTextFormat, 1000f, 100f);
-            }
         }
 
         private void createSizeDependantResources(DeviceContext deviceContext)
@@ -1157,6 +1135,8 @@ namespace save_switcher.Panels
             confirmDeleteText?.Dispose();
             confirmDeleteOKText?.Dispose();
             confirmDeleteCancelText?.Dispose();
+
+            OSKeyboard?.Dispose();
 
             InputManager.RemoveEventsFromObject(this);
         }

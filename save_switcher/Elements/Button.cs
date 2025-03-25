@@ -5,20 +5,18 @@ using System.Diagnostics;
 
 namespace save_switcher.Elements
 {
-    public delegate void HoverEvent();
-    public delegate void PressedEvent();
-    public delegate void HeldEvent();
+    public delegate void ButtonEvent();
 
-    internal abstract class Button : InputNavigable, IDisposable
+    internal abstract class Button : InputNavigable
     {
         static protected bool inputHandled;
 
         public Size2 Size;
         public Vector2 Position;
 
-        public HoverEvent OnHover;
-        public PressedEvent OnPressed;
-        public HeldEvent OnHeld;
+        public ButtonEvent OnHover;
+        public ButtonEvent OnPressed;
+        public ButtonEvent OnHeld;
 
         private bool cursorWithinBounds = false;
 
@@ -49,8 +47,11 @@ namespace save_switcher.Elements
 
             InputManager.OnEnterInput += (t) =>
             {
-                if (t == InputManager.ButtonTravel.Down)
-                    OnPressed?.Invoke();
+                if (CurrentSelectedObject == this)
+                {
+                    if (t == InputManager.ButtonTravel.Down)
+                        OnPressed?.Invoke();
+                }
             };
         }
 
@@ -111,9 +112,13 @@ namespace save_switcher.Elements
 
         public abstract void Draw();
 
-        public new void Dispose()
+        public override void Dispose()
         {
             InputManager.RemoveEventsFromObject(this);
+
+            OnHover = null;
+            OnPressed = null;
+            OnHeld = null;
 
             base.Dispose();
         }
